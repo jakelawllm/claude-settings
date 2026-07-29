@@ -35,6 +35,12 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loos
 - Schedule 8 Part E is marked as a worked example of one practice's arrangements. It stated a Team tier as though it were the template's position, and a practice on Enterprise, Bedrock, Google Cloud or Microsoft-hosted models would have inherited conclusions that are wrong for it.
 - Schedule 5 gains a source and date-last-checked column. A row without a date is to be treated as unverified.
 
+### Testing
+
+- `tests/e2e.test.js`: an opt-in tier that drives the guard through real `claude -p` sessions against a temporary two-matter tree, asserting that a token from the other matter never reaches the answer. Four cases pass. It does not run in CI, which has no credentials.
+- Two unit cases now pin the documented limitations: a Bash command reaching another matter is allowed, and an unrecognised tool is not covered. They fail if the boundary ever moves, so the documentation cannot drift away from the behaviour.
+- The live run established that the Bash route is refused by the model complying with its instructions rather than by the guard. That is instruction-following, not enforcement, and does not hold against an injected instruction.
+
 ### Added
 
 - `.github/workflows/ci.yml`: hook tests on Windows, macOS and Linux; JSON validation; policy Markdown parity against the DOCX; clause reference resolution; full-history secret scan.

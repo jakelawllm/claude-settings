@@ -155,9 +155,14 @@ Managed settings parse tolerantly, so one bad entry is stripped rather than void
 `claude doctor` validates settings keys. It does not exercise the hook, which is ordinary code and fails in ordinary ways. Run its tests separately:
 
 ```
-node tests/matter-guard.test.js
-python scripts/check-clause-refs.py
+node tests/matter-guard.test.js          # the guard, driven directly
+python scripts/check-clause-refs.py      # clause references resolve
+CLAUDE_E2E=1 node tests/e2e.test.js      # optional: real Claude Code sessions
 ```
+
+The first two must always pass and run in CI. The third is opt-in: it launches `claude -p` against a temporary two-matter tree, so it needs a signed-in installation and spends tokens, and it does not run in CI. It exists because driving the hook directly cannot show that Claude Code actually invokes it, with the payload it really sends, and that a refusal at the hook keeps the other matter's content out of the answer. It asserts on containment of a token from the other matter rather than on the wording of a refusal.
+
+Two cases in the unit suite assert what the guard does **not** do: that a Bash command reaching another matter is allowed, and that an unrecognised tool is not covered. They are there so this README cannot drift away from the behaviour. If either starts failing, the boundary has moved and the documentation is wrong in the direction that matters.
 
 Every case must pass. Two cases are skipped on Windows, where POSIX permission bits do not apply; CI runs them on Linux and macOS. A hook that crashes or is misconfigured is not obviously broken from inside a session: in `warn` it says nothing, and in `enforce` a fault that stops it running removes the boundary rather than announcing itself. The suite is the only thing that tells you the guard still works.
 

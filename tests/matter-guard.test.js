@@ -69,14 +69,14 @@ function call(ev, env, rawInput) {
 const decision = (o) =>
   (o.hookSpecificOutput && o.hookSpecificOutput.permissionDecision) || 'allow';
 
-function pre(session, tool, target, cwd, env) {
+function pre(session, tool, target, cwd, env, rawInput) {
   const key = tool === 'Grep' || tool === 'Glob' ? 'path' : 'file_path';
   return call(
     {
       hook_event_name: 'PreToolUse',
       session_id: session,
       tool_name: tool,
-      tool_input: { [key]: target },
+      tool_input: rawInput || { [key]: target },
       cwd,
     },
     env
@@ -246,6 +246,34 @@ check(
   '27 other matter archive refused',
   decision(pre('a3', 'Read', path.join(CENTRAL, 'Jones', 's.jsonl'), SMITH, envC)),
   'deny'
+);
+
+// -- documented limitations, pinned ---------------------------------------
+//
+// These assert what the guard does NOT do. They exist so that the README and
+// SECURITY.md cannot drift away from the behaviour: if one of these ever
+// starts failing, the boundary has moved and the documentation is now wrong in
+// the dangerous direction.
+
+freshState();
+pre('lim1', 'Read', path.join(SMITH, 'a.txt'), SMITH);
+check(
+  '30 Bash across matters is allowed (known gap)',
+  decision(pre('lim1', 'Bash', null, SMITH, undefined, { command: `cat ${path.join(JONES, 'b.txt')}` })),
+  'allow'
+);
+check(
+  '31 an unknown tool is not covered (known gap)',
+  decision(
+    call({
+      hook_event_name: 'PreToolUse',
+      session_id: 'lim1',
+      tool_name: 'SomeFutureTool',
+      tool_input: { file_path: path.join(JONES, 'b.txt') },
+      cwd: SMITH,
+    })
+  ),
+  'allow'
 );
 
 // -- state hygiene (H-03) --------------------------------------------------
