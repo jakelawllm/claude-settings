@@ -21,6 +21,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loos
 - Matters roots are resolved to their real paths. They were canonicalised lexically while targets were resolved, so on macOS, where `/var` is a symlink to `/private/var`, a root under it matched nothing: no path looked like client material and every cross-matter access was permitted. Found by cross-platform CI on its first run.
 - All GitHub Actions are pinned to full commit SHAs.
 
+### Policy template
+
+- Clause 8.8 now states that "a retention period is neither publication nor training" is a conclusion the practice has reached on the wording of the instruments, not a supplier fact, and requires approval by the principal with a date. It is the reasoning that permits restricted information on a tier without zero data retention, so an adopting practice must reach its own view rather than inherit this one.
+- Schedule 8 distinguishes three kinds of statement that were previously read alike: a supplier fact traceable to the evidence file, a deployment fact an adopting practice must replace, and a conclusion carrying its approval date.
+- Schedule 8 Part E is marked as a worked example of one practice's arrangements. It stated a Team tier as though it were the template's position, and a practice on Enterprise, Bedrock, Google Cloud or Microsoft-hosted models would have inherited conclusions that are wrong for it.
+- Schedule 5 gains a source and date-last-checked column. A row without a date is to be treated as unverified.
+
 ### Added
 
 - `.github/workflows/ci.yml`: hook tests on Windows, macOS and Linux; JSON validation; policy Markdown parity against the DOCX; clause reference resolution; full-history secret scan.
