@@ -18,6 +18,8 @@ It is offered for comparison and adaptation. It is a configuration baseline, not
 
 `matter-settings.json` is an optional per-matter file, placed at `.claude/settings.json` inside a matter folder, which denies the web tools for work where nothing should be reaching outward.
 
+`hooks/matter-guard.js` keeps one session to one matter and files the session record to the matter folder. It is the only part of this repository that enforces something the settings keys cannot express, and it is wired up in `managed-settings.json`. `tests/matter-guard.test.js` is its test suite; run it before deploying a change to the hook, because two of its cases exist for bugs that were live in earlier drafts.
+
 `ai-policy-legal-practice-template.docx` is the policy these files exist to enforce, as a template for an Australian practice. `ai-policy-legal-practice-template.md` is a rendering of it produced by `scripts/docx-to-md.py`, so that it can be read and diffed here. The `.docx` is the authoritative document. The policy governs: where it and the configuration differ, the configuration is wrong.
 
 ## Before you deploy anything
@@ -109,6 +111,14 @@ claude doctor      # lists any managed entry stripped as invalid, with source an
 ```
 
 Managed settings parse tolerantly, so one bad entry is stripped rather than voiding the file. That tolerance does not extend to user, project or local settings, where a file that fails validation is rejected whole. Deploy to one machine and run `claude doctor` before pushing to the fleet.
+
+`claude doctor` validates settings keys. It does not exercise the hook, which is ordinary code and fails in ordinary ways. Run its tests separately:
+
+```
+node tests/matter-guard.test.js hooks/matter-guard.js
+```
+
+Twenty-two cases, and they must all pass. A hook that crashes or is misconfigured is not obviously broken from inside a session: in `warn` it says nothing, and in `enforce` a fault that stops it running removes the boundary rather than announcing itself. The suite is the only thing that tells you the guard still works.
 
 ## What the settings do
 
@@ -219,7 +229,9 @@ Configuration cannot answer the underlying questions. Whether the retainer or th
 
 ## Status
 
-Written for Claude Code v2.1.207 and later, July 2026. Tested on macOS and Windows.
+Written for Claude Code v2.1.207 and later, July 2026. The settings are tested on macOS and Windows. `hooks/matter-guard.js` requires Node and is tested on Windows; its twenty-two tests pass there.
+
+The platform difference matters and is not cosmetic. The Bash sandbox, which is the only boundary the operating system enforces rather than the client, runs on macOS, Linux and WSL2 and not on native Windows. On Windows the matter boundary is the hook alone, and the hook confines Bash by working directory rather than by inspecting commands, so a shell command can still read across matters. A practice running on Windows should know that it holds the weaker of the two positions, and that running Claude Code inside WSL2 obtains the stronger one.
 
 ## Licence
 
