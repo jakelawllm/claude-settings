@@ -18,6 +18,8 @@ It is offered for comparison and adaptation. It is a configuration baseline, not
 
 `matter-settings.json` is an optional per-matter file, placed at `.claude/settings.json` inside a matter folder, which denies the web tools for work where nothing should be reaching outward.
 
+`skills/ai-policy-compliance/SKILL.md` is the conduct layer. The settings decide what the tool may do; the skill decides what may be produced and what must be said about it. It refuses to draft the content of evidence, stops and asks when material looks like clause 8 restricted information, requires a verification worklist and a Schedule 2 record with any draft that cites authority, and refuses to tell a practitioner that a citation has been checked. Deploy it at the enterprise level, alongside the managed settings file, where it overrides a personal or project skill of the same name so a user cannot shadow it.
+
 `hooks/matter-guard.js` keeps one session to one matter and files the session record to the matter folder. It is the only part of this repository that enforces something the settings keys cannot express, and it is wired up in `managed-settings.json`. `tests/matter-guard.test.js` is its test suite; run it before deploying a change to the hook, because two of its cases exist for bugs that were live in earlier drafts.
 
 `ai-policy-legal-practice-template.docx` is the policy these files exist to enforce, as a template for an Australian practice. `ai-policy-legal-practice-template.md` is a rendering of it produced by `scripts/docx-to-md.py`, so that it can be read and diffed here. The `.docx` is the authoritative document. The policy governs: where it and the configuration differ, the configuration is wrong.
@@ -208,6 +210,8 @@ A Solicitor's Guide to Responsible Use of Artificial Intelligence, Law Society o
 These files are an enforcement layer for parts of four clauses of the policy, and no part of the rest.
 
 They reach clause 6, by confining sign-in and the servers a session can call; clause 7, by stating the prohibited uses as a standing instruction; clause 8, by stating the restricted categories and the four satisfactions required before any of them is used; clause 16, through retention, local storage and access; and part of clause 17, because the session record is filed to the matter folder rather than left in a user profile.
+
+The skill at `skills/ai-policy-compliance/SKILL.md` reaches further than the settings can, because it governs the answer rather than the tool: clause 7's prohibitions as a refusal, clause 9's verification as a worklist that never claims to have been done, clause 10's disclosure wordings, clause 17's record, and clause 20's reporting duty when a breach is disclosed rather than prevented. It is instruction rather than enforcement, which is why it sits above the settings and not instead of them.
 
 They do not reach clause 9, verification; clause 10, disclosure to courts and tribunals; clause 11, experts and counsel; clause 12, clients, their own terms and their consent; clause 14, costs; clause 15, recording and transcription; the rest of clause 17, since a transcript is not the structured record clause 17.2 requires; clause 18, training; clause 20, incidents; or clause 21, compliance. Those clauses are discharged by people, and a configuration cannot be written that discharges them.
 
