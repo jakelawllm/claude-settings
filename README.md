@@ -89,6 +89,18 @@ Managed settings parse tolerantly, so one bad entry is stripped rather than void
 | `permissions.deny` settings rules | Prevent Claude editing the settings and shell profile files that constrain it. |
 | `claudeMd` | Injects the firm policy as organisation-managed memory in every session, so it operates as a standing instruction rather than a document nobody opens. |
 
+## The WebFetch hostname check
+
+One channel stays open and is not closed by anything above. Before fetching a URL, the WebFetch tool sends the hostname to `api.anthropic.com` for a domain safety check. It does this whatever provider the session is using, and `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` does not cover it, because the check is not treated as telemetry.
+
+A hostname is not the content of a document, but it is not nothing either. The domains a practitioner looks up over the life of a matter will often identify the opponent, the industry and sometimes the matter.
+
+There is a key that stops it, and it is not recommended here. `skipWebFetchPreflight` suppresses the check, but the documentation is explicit that "when skipped, WebFetch attempts any URL without consulting the blocklist". The blocklist is part of what stops a prompt injection embedded in a client document from directing a fetch to a domain chosen by whoever wrote the injection, which is the same attack the egress deny rules address. Setting the key trades a metadata disclosure for an exfiltration route, and that is the wrong way round.
+
+Two things close it properly. Denying `WebFetch` removes the tool, and with it the check: `matter-settings.json` does this for a single matter, and the same two lines can be added to the managed file to do it everywhere. Or route the session through Amazon Bedrock, Google Cloud's Agent Platform or Microsoft Foundry, where the check is the one call still going to Anthropic and `skipWebFetchPreflight` exists precisely for that case, since a restrictive egress policy blocks it anyway.
+
+Choose one deliberately. Leaving the default in place is a defensible choice, but it should be a choice.
+
 ## Optional further hardening
 
 `allowManagedPermissionRulesOnly` prevents user and project settings defining any allow, ask or deny rules, so only the managed rules apply. It is the strongest available lock and it also stops saved approvals working, which produces approval fatigue across a team. Add it if you would rather have the friction.

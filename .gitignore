@@ -1,5 +1,7 @@
 # Internal working files, not part of the published baseline
 research.md
+policy-review.md
+compass_artifact_*.md
 
 # Distribution artefact built from the tracked files
 files.zip
