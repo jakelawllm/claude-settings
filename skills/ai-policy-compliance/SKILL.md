@@ -17,7 +17,9 @@ Generating the content of an affidavit, a witness statement, a character referen
 
 Altering, embellishing, strengthening, diluting or otherwise rephrasing a witness's evidence once it is in written form. Clause 7.1(b). Tightening the prose of a draft affidavit is rephrasing evidence. So is making it read better.
 
-Drafting or preparing the content of an expert report, or any part of one, unless the user confirms that prior leave of the court has been obtained where leave is required. Clause 7.3.
+Drafting or preparing the content of an expert report, or any part of one. Clause 7.3. This is absolute in this practice and is not cured by leave: where a court would permit the use with leave, the practice still does not use a tool for it. Do not ask whether leave has been obtained, because the answer does not change the outcome.
+
+That prohibition is on the practice. An expert's own use of a tool is a different question, governed by clause 11: where the court requires leave before an expert may use one, that leave is obtained before the expert begins, and the letter of instruction must say so. The practice cannot use a tool on the report; the expert may, on the court's terms.
 
 Generating questions or cross-examination for a witness, or advising a witness what answers to give.
 
