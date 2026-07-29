@@ -48,7 +48,7 @@ The contractual term that inputs and outputs are not used to train any model and
 
 The closure of every channel retaining material for longer than the session. That is what the five environment variables at the head of the file do. The feedback, bug and share commands retain for five years and an accepted transcript share for six months, against thirty days for the session itself, so on a plan without zero retention these are the settings that matter most and are mandatory rather than prudent.
 
-The practice being able to show from its own records what was sent and when. This is the one that needs care, and it is dealt with next.
+The practitioner being able to show from the practice's own records that the material was sent, when, by whom and to which endpoint. This is the one that needs care, and it is dealt with next.
 
 Australian Privacy Principle 8 sits alongside all of this and is not answered by retention either. Sending personal information to United States infrastructure is a disclosure for which the practice remains accountable, and clause 6.5(d) requires the basis for satisfying APP 8 to be recorded before a tool is approved.
 
@@ -56,13 +56,15 @@ Australian Privacy Principle 8 sits alongside all of this and is not answered by
 
 The five OpenTelemetry keys give the practice its own record of sessions, and that record is the third limb above. It is important to be exact about what it holds, because it is easy to assume it holds more.
 
-By default it does not contain what was sent. Claude Code redacts user prompt text, tool input details and tool content from telemetry unless the corresponding variables are set; what the collector receives for a prompt is `user_prompt_length`, the length in characters. The default record therefore establishes that a session occurred, when, on which machine, and how much was sent. It does not establish the content, and it does not contain model output at all.
+By default it does not contain what was sent. Content is gated separately from telemetry itself, and every gate is off unless it is set. `OTEL_LOG_USER_PROMPTS` governs prompt text, `OTEL_LOG_ASSISTANT_RESPONSES` the model's replies, and `OTEL_LOG_TOOL_DETAILS` and `OTEL_LOG_TOOL_CONTENT` the tool arguments and results. With all four unset, what the collector receives for a prompt is `user_prompt_length`, the length in characters. The record therefore establishes that a session occurred, when, by whom and how much was sent. It does not establish the content, and it holds no model output at all.
 
-That is still a real record, and for most purposes it is the right one: it evidences the fact and timing of transmission without creating a second copy of the client's material.
+That is still a real record, and for the third limb above it is the right one: it evidences transmission without creating a second copy of the client's material.
 
-Where the content itself must be recoverable, there are three routes and they should be chosen deliberately rather than by default. `OTEL_LOG_USER_PROMPTS` and `OTEL_LOG_ASSISTANT_RESPONSES` make the collector hold the conversation, which means the collector becomes a repository of privileged material and must be secured, retained and disclosed on the same footing as the matter file. The local transcript holds the session but expires on `cleanupPeriodDays`, set to seven here, and is disabled entirely by `CLAUDE_CODE_SKIP_PROMPT_HISTORY`. Or the record is made by hand on the matter file, which is what a clause 17 record and a Schedule 2 form are for.
+Where the content itself must be recoverable, there are three routes, and they should be chosen rather than fallen into. Setting the gates makes the collector hold the conversation, at which point it becomes a store of privileged material and must be secured, retained and disclosed on the same footing as the matter file. The local transcript holds the session but expires on `cleanupPeriodDays`, set to seven here, and is removed entirely by `CLAUDE_CODE_SKIP_PROMPT_HISTORY`. Or the record is made by hand on the matter file, which is what a clause 17 record and a Schedule 2 form are for. The third is the one the policy relies on.
 
-Decide which of those applies before relying on the collector to discharge an obligation to identify what a tool produced and how it was verified. All three can be off at once without anything announcing it.
+Two properties of the gates are worth knowing before touching them. `OTEL_LOG_ASSISTANT_RESPONSES` falls back to the value of `OTEL_LOG_USER_PROMPTS` when it is unset, so enabling prompt content also enables response content unless the response gate is expressly set to `0`. And where sign-in is by OAuth, the user's email address appears in telemetry attributes, which the collector's own retention has to account for whether or not any content gate is set.
+
+All three content records can be off at once, and nothing announces it.
 
 Exclude the `.claude` directory from OneDrive, Dropbox, iCloud Drive, roaming profiles and any consumer backup agent, and keep whole-disk encryption on. Session transcripts are written there in plaintext. They are the firm's own records on the firm's own machine, so they are not a disclosure to anyone, but a sync client that replicates the home directory turns them into one by a route nobody assessed.
 

@@ -7,8 +7,8 @@ A template for Australian legal practices
 
 | Field | Detail | Version | History |
 |---|---|---|---|
-| Policy owner | [Name or position] | 2.0 | [Date] Adopted |
-| Approved by | [Principals or board] |  |  |
+| Policy owner | Principal | 3.0 | [Date] Adopted |
+| Approved by | Principal |  |  |
 | Effective from | [Date] |  |  |
 | Next review | [Date, not later than 12 months] |  |  |
 | Applies to | All personnel and contractors |  |  |
@@ -45,19 +45,21 @@ Contents
 
 14  Costs
 
-15  Privacy and information security
+15  Recording, transcription and note-taking
 
-16  Records
+16  Privacy and information security
 
-17  Training
+17  Records
 
-18  Responsibility
+18  Training
 
-19  Incidents
+19  Responsibility
 
-20  Compliance and consequences
+20  Incidents
 
-21  Exceptions and review
+21  Compliance and consequences
+
+22  Exceptions and review
 
 Schedule 1  Approved Tools Register
 
@@ -73,9 +75,11 @@ Schedule 6  Suitability path
 
 Schedule 7  Indicators of unverified or undisclosed use
 
-Schedule 8  Quick reference
+Schedule 8  Application settings
 
-Schedule 9  Acknowledgment
+Schedule 9  Quick reference
+
+Schedule 10  Acknowledgment
 
 ## 1  Purpose
 
@@ -121,13 +125,15 @@ restricted information means client information or other material falling within
 
 court document means any document filed with or provided to a court or tribunal, including a pleading, a written submission, an affidavit, a witness statement and an expert report.
 
-AI Officer means the person appointed under clause 18.1, who may be the practice's Privacy Officer or Compliance Manager.
+AI Officer means the person appointed under clause 19.1, who may be the practice's Privacy Officer or Compliance Manager.
 
 responsible practitioner means the solicitor with day-to-day responsibility for the matter, and where a decision under clause 8 is required, the principal or partner with supervisory responsibility for it.
 
 **3.2**  Functions that do not generate substantive content are outside this policy. That includes spelling and grammar correction, formatting, optical character recognition, transcription and translation, provided the tool used is not a public tool and no restricted information is involved. It also includes a search engine that returns a list of results rather than a personalised answer, and dedicated legal research software that searches across legislation, judgments and legal texts without producing a personalised textual answer to a prompt.
 
-**3.3**  The exclusion in clause 3.2 is narrow. A tool that summarises, drafts, analyses, answers a question or produces a chronology is within this policy even where it is a feature of software the practice already uses. The generation of chronologies, indexes and witness lists is treated as a permitted use rather than an excluded function.
+**3.3**  A tool used for any function described in clause 3.2 remains subject to clause 6 where client information is provided to it. Being outside the balance of this policy does not make a tool an approved tool, and transcription, optical character recognition and translation of client material must be carried out only through a tool recorded in Schedule 1. Recording and transcription are further governed by clause 15.
+
+**3.4**  The exclusion in clause 3.2 is narrow. A tool that summarises, drafts, analyses, answers a question or produces a chronology is within this policy even where it is a feature of software the practice already uses. The generation of chronologies, indexes and witness lists is treated as a permitted use rather than an excluded function.
 
 ## 4  The obligations this policy serves
 
@@ -167,7 +173,7 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 
 **6.2**  Anonymisation is not a substitute for using an approved tool. In a matter of any substance the combination of facts, dates, amounts and locations required to obtain a useful answer will often identify the client or the matter to a reader who knows the field, and re-identification is outside the practice's control once the material has been sent.
 
-**6.3**  A tool is approved by [the AI Officer, with the approval of the principals] and is then recorded in Schedule 1. Use of a tool outside the scope recorded there is a breach of this policy. A contractual arrangement with a client that restricts the use of AI overrides any approval, and that obligation is paramount.
+**6.3**  A tool is approved by the AI Officer, with the approval of the principals, and is then recorded in Schedule 1. Use of a tool outside the scope recorded there is a breach of this policy. A contractual arrangement with a client that restricts the use of AI overrides any approval, and that obligation is paramount.
 
 **6.4**  Approval must be informed by a risk assessment addressing confidentiality and privacy, the accuracy and reliability of outputs, bias in the system, regulatory compliance, professional liability, the effect on clients, and whether the tool and the processes around it can be audited.
 
@@ -193,6 +199,12 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 
 **6.9**  A request to use a tool not in Schedule 1 is made to the AI Officer before the tool is used. Trials on client material are not permitted.
 
+**6.10**  A setting that an individual user can change is not a control on which the practice may rely. Where a matter in clause 6.5 depends on a setting, that setting must be enforced by an administrator, by managed policy or by contract. Where enforcement of that kind is not available, the tool is not approved for use with client information.
+
+**6.11**  For each approved tool the AI Officer keeps an evidence file containing the executed agreement and data processing terms, the term recording that inputs and outputs are not used for training, the retention setting in force, the supplier's statement of where data is processed and stored, the list of sub-processors, and a record of the administrator-enforced settings as they stand. That file is what establishes the satisfaction required by clause 8.3 and the reasonable steps required by clause 16.1, and a tool without it is not approved.
+
+**6.12**  Schedule 8 records, for each application in use, the tier or contractual arrangement required, the settings that must be in force, whether the application may be used with restricted information, and what the evidence file must contain. Schedule 8 is maintained by the AI Officer and is reviewed quarterly, because these settings change more often than this policy does.
+
 ## 7  Prohibited uses
 
 **7.1**  The following are prohibited without exception:
@@ -209,6 +221,8 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 **7.2**  Work that is preparatory to the drafting of a witness's evidence is not prohibited by clause 7.1(a). Preparing a chronology, an index, a list of topics or a summary of documents for the solicitor's own use is permitted. The line is that the affidavit or statement must be sworn, affirmed or finalised in a form that reflects the witness's own knowledge and the witness's own words.
 
 **7.3**  A tool must not be used to draft or prepare the content of an expert report, or any part of one, without prior leave of the court where leave is required. See clause 11.
+
+**7.4**  The applications listed in Part D of Schedule 8 must not be used for any work of the practice. An application is placed in Part D where its terms permit inputs to be used for training with no opt-out the practice can enforce, where the data is processed in a jurisdiction the practice cannot accept, where it joins or records a conversation without a positive act by the user, or where its data handling cannot be established at all.
 
 ## 8  Restricted information
 
@@ -237,6 +251,8 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 **8.6**  The approval form at Schedule 4 may be used to record an approval. An approval must identify the material, the tool, the purpose and the proceeding, and must be signed by the responsible practitioner.
 
 **8.7**  Where the practitioner cannot be satisfied of each matter in clause 8.3, the material is not to be used with any tool. Difficulty or inconvenience in establishing those matters is a reason not to use the tool, not a reason to proceed.
+
+**8.8**  A supplier retention period is not of itself publication, and it is not training. The absence of a zero retention arrangement therefore does not prevent satisfaction under clause 8.3, and on some subscription tiers such an arrangement is not offered at all. Where it is unavailable, satisfaction rests on three things instead: the contractual term that inputs and outputs are not used to train any model and are not made publicly available, the closure of every channel that retains material for longer than the ordinary session, and the practice being able to show from its own records that material was sent, when, by whom and to which endpoint. Where the content itself must be recoverable, that record is made under clause 17 on the matter file, or by configuring the practice's telemetry to retain content, and Schedule 8 records which applies to each application. Part E of that schedule records the consequences of the tier the practice holds.
 
 ## 9  Verification
 
@@ -278,7 +294,7 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 
 **10.5**  Evidentiary material generally. Use of a tool must be disclosed where it has been used to summarise or analyse information on which a witness relies to make a statement of fact or express an opinion, where it has produced an image, video, audio recording or other multimedia placed before the court, or where it has been used in any way that might reasonably be expected to affect the admissibility of the evidence or the use the court makes of it. Disclosure appears in the body of the document at its start and states as concisely as possible where and how the tool was used.
 
-**10.6**  Readiness to answer. Every practitioner must be in a position to tell the court what tool was used, how it was used and for what purpose, whether or not disclosure was required. The record kept under clause 16 exists for that purpose.
+**10.6**  Readiness to answer. Every practitioner must be in a position to tell the court what tool was used, how it was used and for what purpose, whether or not disclosure was required. The record kept under clause 17 exists for that purpose.
 
 **10.7**  A court may require disclosure in circumstances beyond those set out above, and may make orders or give directions about the use of AI in a particular proceeding. Any such order or direction prevails.
 
@@ -340,49 +356,67 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 
 **14.5**  On request, a client is to be told how the use of AI is reflected in the costs charged.
 
-## 15  Privacy and information security
+## 15  Recording, transcription and note-taking
 
-**15.1**  Where personal information is sent to a supplier outside Australia, the practice remains accountable for the recipient's handling of it. Before any tool is approved for use with personal information, the AI Officer must record where the processing occurs and the basis on which Australian Privacy Principle 8 is satisfied.
+**15.1**  This clause applies to any tool that records, transcribes or summarises a conversation, meeting, conference or telephone call, whether it joins as a participant, runs on the device, or processes a recording afterwards. A recorded client conference is among the most sensitive material the practice holds, and the exposure is greater in the conference room than in the courtroom.
 
-**15.2**  Approved tools must be accessed only from a practice device, or a personal device that complies with the practice's device policy, using the practice's account and multi-factor authentication.
+**15.2**  Only a tool recorded in Part C of Schedule 8 may be used. A tool that joins a meeting, begins recording or circulates a transcript without a positive act by the user must not be installed on a practice device or connected to a practice account.
 
-**15.3**  Where a tool stores prompts, outputs or session records on the local device, that location must be identified, must sit within the practice's encryption arrangements, and must be excluded from consumer file synchronisation and backup services. A local record of client material is not a disclosure to anyone, but a synchronisation client that replicates it off the device is.
+**15.3**  Recording must not begin until every participant has been told that the conversation is being recorded and transcribed by a tool, and has agreed. The agreement is obtained on the record at the start of the conversation and is noted on the matter file. The wording at Schedule 3 may be used.
 
-**15.4**  Retention settings must be configured to the shortest period consistent with the practice's record-keeping obligations. Where a supplier offers a setting that permits inputs to be used for model training, it must be off, and the AI Officer must verify periodically that it remains off.
+**15.4**  The reason for clause 15.3 is that the law of the relevant State or Territory constrains both the recording and its distribution, and the constraints differ. In New South Wales, section 7 of the Surveillance Devices Act 2007 (NSW) prohibits the use of a listening device to record a private conversation to which the practitioner is a party, unless a principal party consents or a narrow protection of lawful interests exception applies, and section 11 separately restricts communicating or publishing the recording to a person who was not a party. Uploading audio to a supplier for transcription is capable of engaging that second prohibition. In Victoria, section 6 of the Surveillance Devices Act 1999 (Vic) permits a party to record but section 11 restricts communication and publication. In Queensland, section 43 of the Invasion of Privacy Act 1971 (Qld) is to similar effect, with sections 44 and 45 restricting publication. The practitioner must identify the applicable jurisdiction before recording, and where participants are in different States, must satisfy the strictest of them.
 
-**15.5**  Documents generated with AI assistance are records of the practice and must be filed in the practice's document management system, not left in a tool, a personal folder or a chat history.
+**15.5**  Recording, transcription and note-taking by any means, including an application running on a laptop or telephone connected to a hearing, is prohibited in a courtroom or court precinct and in any remote hearing. In New South Wales section 9 of the Court Security Act 2005 (NSW) makes unauthorised recording in court premises an offence, and sections 9A and 9B restrict transmission and distribution. The Federal Court and the Federal Circuit and Family Court prohibit unauthorised recording of court events. Leave of the court is required and is not to be assumed from the fact that a hearing is conducted remotely.
 
-## 16  Records
+**15.6**  A transcript produced by a tool is not evidence of what was said. It is a working record, it contains errors, and it must not be provided to a client, an opposing party or a court as a record of the conversation without being checked against the audio by the person who was present.
 
-**16.1**  Where a tool has been used on a matter in a way that requires disclosure under clause 10, or that involved restricted information under clause 8, a record must be made on the matter file. The form at Schedule 2 may be used.
+**15.7**  Where a conversation concerns restricted information, clause 8 applies to the recording and to the transcript, and an approval under clause 8.3 is required before either is provided to any tool.
 
-**16.2**  The record must identify the tool and version, the date, the person who used it, the purpose, the material provided to it, the specific portions of any document produced with its assistance, what was done with the output, and who verified the output and against what source.
+## 16  Privacy and information security
 
-**16.3**  Where output is used in a court document, the practice retains a record of the output itself, so that the portions produced with assistance can be identified later.
+**16.1**  Where personal information is sent to a supplier outside Australia, the practice remains accountable for the recipient's handling of it. Before any tool is approved for use with personal information, the AI Officer must record where the processing occurs and the basis on which Australian Privacy Principle 8 is satisfied.
 
-**16.4**  Records under this clause are retained for the same period as the matter file. They may be subject to discovery, to a subpoena directed to the practice, and to production in a costs assessment or a complaint, and are to be prepared on that basis.
+**16.2**  Approved tools must be accessed only from a practice device, or a personal device that complies with the practice's device policy, using the practice's account and multi-factor authentication.
 
-**16.5**  The practice maintains logging of AI use at the level available from each approved tool. Where a tool cannot produce a record of what was sent to it, that limitation is recorded in Schedule 1 and taken into account when the tool is considered for use with restricted information.
+**16.3**  Where a tool stores prompts, outputs or session records on the local device, that location must be identified, must sit within the practice's encryption arrangements, and must be excluded from consumer file synchronisation and backup services. A local record of client material is not a disclosure to anyone, but a synchronisation client that replicates it off the device is.
 
-## 17  Training
+**16.4**  Retention settings must be configured to the shortest period consistent with the practice's record-keeping obligations. Where a supplier offers a setting that permits inputs to be used for model training, it must be off, and the AI Officer must verify periodically that it remains off.
 
-**17.1**  No person may use an approved tool on client work until they have completed the practice's induction training on this policy.
+**16.5**  Documents generated with AI assistance are records of the practice and must be filed in the practice's document management system, not left in a tool, a personal folder or a chat history.
 
-**17.2**  Training covers this policy, the instruments at Schedule 5, the capabilities and limitations of the tools in use, how to prompt them, how to recognise bias and inaccuracy in output, the verification requirements in clause 9, and for supervisors, how to supervise AI-assisted work.
+## 17  Records
 
-**17.3**  Training is repeated annually and on any material change to this policy or to the tools approved. New personnel, including temporary personnel, receive the policy and the training on commencement.
+**17.1**  Where a tool has been used on a matter in a way that requires disclosure under clause 10, or that involved restricted information under clause 8, a record must be made on the matter file. The form at Schedule 2 may be used.
 
-## 18  Responsibility
+**17.2**  The record must identify the tool and version, the date, the person who used it, the purpose, the material provided to it, the specific portions of any document produced with its assistance, what was done with the output, and who verified the output and against what source.
 
-**18.1**  The practice appoints [name or position] as AI Officer. The AI Officer maintains Schedules 1 and 5, decides requests under clause 6.9, receives reports under clause 19, conducts the reviews under clause 20, and reports to the principals at least annually on the use of AI in the practice.
+**17.3**  Where output is used in a court document, the practice retains a record of the output itself, so that the portions produced with assistance can be identified later.
 
-**18.2**  The principals are responsible for the operation of this policy, for providing the resources it requires, and for ensuring that supervision arrangements account for AI-assisted work.
+**17.4**  Records under this clause are retained for the same period as the matter file. They may be subject to discovery, to a subpoena directed to the practice, and to production in a costs assessment or a complaint, and are to be prepared on that basis.
 
-**18.3**  Each person to whom this policy applies is responsible for their own compliance and for reporting under clause 19.
+**17.5**  The practice maintains logging of AI use at the level available from each approved tool. Where a tool cannot produce a record of what was sent to it, that limitation is recorded in Schedules 1 and 8 and taken into account when the tool is considered for use with restricted information.
 
-## 19  Incidents
+**17.6**  The record required by this clause is the record made on the matter file. The local session cache and the practice's telemetry are operational records, are retained for shorter periods, and are not a substitute for it. Where an application is configured so that no automatic record of content is kept, that is noted in Schedule 8 against the application.
 
-**19.1**  A person who becomes aware of any of the following must report it to the AI Officer immediately, and in any event on the same day:
+## 18  Training
+
+**18.1**  No person may use an approved tool on client work until they have completed the practice's induction training on this policy.
+
+**18.2**  Training covers this policy, the instruments at Schedule 5, the capabilities and limitations of the tools in use, how to prompt them, how to recognise bias and inaccuracy in output, the verification requirements in clause 9, and for supervisors, how to supervise AI-assisted work.
+
+**18.3**  Training is repeated annually and on any material change to this policy or to the tools approved. New personnel, including temporary personnel, receive the policy and the training on commencement.
+
+## 19  Responsibility
+
+**19.1**  The practice appoints the Principal as AI Officer. The Principal may delegate the role in writing, and any delegation is recorded in the document control table at the front of this policy. The AI Officer maintains Schedules 1, 5 and 8 and the evidence files kept under clause 6.11, decides requests under clause 6.9, receives reports under clause 20, conducts the reviews under clause 21, and reports to the principals at least annually on the use of AI in the practice.
+
+**19.2**  The principals are responsible for the operation of this policy, for providing the resources it requires, and for ensuring that supervision arrangements account for AI-assisted work.
+
+**19.3**  Each person to whom this policy applies is responsible for their own compliance and for reporting under clause 20.
+
+## 20  Incidents
+
+**20.1**  A person who becomes aware of any of the following must report it to the AI Officer immediately, and in any event on the same day:
 
 - **(a)** client information entered into a public tool;
 - **(b)** restricted information used without an approval under clause 8;
@@ -391,27 +425,29 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 - **(e)** a suspected security incident or unauthorised access affecting an approved tool; or
 - **(f)** any use of AI that may breach this policy, whether by that person or another.
 
-**19.2**  A report under clause 19.1 is not itself a disciplinary matter. Failing to report is.
+**20.2**  A report under clause 20.1 is not itself a disciplinary matter. Failing to report is.
 
-**19.3**  On receiving a report the AI Officer must assess whether the incident involves a breach of confidentiality, an eligible data breach requiring notification, a breach of an undertaking or court order, a matter requiring correction with a court, or a matter requiring notification to the practice's professional indemnity insurer, and must act accordingly and record the assessment.
+**20.3**  On receiving a report the AI Officer must assess whether the incident involves a breach of confidentiality, an eligible data breach requiring notification, a breach of an undertaking or court order, a matter requiring correction with a court, whether it requires disclosure to the client whose information or matter is affected and, if so, by whom and when, or a matter requiring notification to the practice's professional indemnity insurer, and must act accordingly and record the assessment.
 
-**19.4**  Notification to the insurer is governed by the policy of insurance. Where an incident may give rise to a claim, the notification requirements of that policy are attended to before any communication with the client about liability.
+**20.4**  The decision whether to inform the client, and what to tell them, is made by the responsible practitioner together with a principal, not by the AI Officer alone. The presumption is that the client is told. A decision not to inform the client must be recorded with the reasons for it. Clause 12.5 requires a complete and accurate answer where a client asks. This clause is why the practice does not wait to be asked.
 
-## 20  Compliance and consequences
+**20.5**  Notification to the insurer is governed by the policy of insurance. Where an incident may give rise to a claim, the notification requirements of that policy are attended to before any communication with the client about liability.
 
-**20.1**  The AI Officer conducts periodic reviews of compliance, which may include reviewing matter files, tool logs and the records kept under clause 16. Where an approved tool offers monitoring or logging, the practice may use those features to review activity and audit compliance.
+## 21  Compliance and consequences
 
-**20.2**  A breach of this policy may result in disciplinary action in accordance with the practice's disciplinary procedures, up to and including termination.
+**21.1**  The AI Officer conducts periodic reviews of compliance, which may include reviewing matter files, tool logs and the records kept under clause 17. Where an approved tool offers monitoring or logging, the practice may use those features to review activity and audit compliance.
 
-**20.3**  A breach may also expose the individual to a costs order made personally, a complaint to the designated local regulatory authority, and a finding of unsatisfactory professional conduct or professional misconduct.
+**21.2**  A breach of this policy may result in disciplinary action in accordance with the practice's disciplinary procedures, up to and including termination.
 
-## 21  Exceptions and review
+**21.3**  A breach may also expose the individual to a costs order made personally, a complaint to the designated local regulatory authority, and a finding of unsatisfactory professional conduct or professional misconduct.
 
-**21.1**  An exception to this policy may be granted only by [a principal], in writing, for a stated purpose and period, and must be recorded with the reasons for it. Clause 7.1 is not subject to exception.
+## 22  Exceptions and review
 
-**21.2**  This policy is reviewed at least annually, and on any amendment to the instruments at Schedule 5, any change to the regulatory guidance on which it rests, or any incident under clause 19 that indicates a deficiency in it. The instruments at Schedule 5 are themselves under periodic review by the courts that issued them, and several have already been amended.
+**22.1**  An exception to this policy may be granted only by a principal, in writing, for a stated purpose and period, and must be recorded with the reasons for it. Clause 7.1 is not subject to exception.
 
-**21.3**  The version history is recorded in the document control table at the front of this policy.
+**22.2**  This policy is reviewed at least annually, and on any amendment to the instruments at Schedule 5, any change to the regulatory guidance on which it rests, or any incident under clause 20 that indicates a deficiency in it. The instruments at Schedule 5 are themselves under periodic review by the courts that issued them, and several have already been amended.
+
+**22.3**  The version history is recorded in the document control table at the front of this policy.
 
 ## Schedule 1  Approved Tools Register
 
@@ -427,7 +463,7 @@ A tool may be recorded as not approved for use with restricted information under
 
 ## Schedule 2  AI Use Record
 
-To be completed and placed on the matter file where clause 16.1 applies.
+To be completed and placed on the matter file where clause 17.1 applies.
 
 | Item | Detail |
 |---|---|
@@ -474,6 +510,12 @@ We use artificial intelligence tools to assist with parts of our work, such as r
 
 Please do not enter our advice, our correspondence with you, or documents about your matter into a publicly available artificial intelligence tool such as a free chatbot. Communications between us are confidential, and that confidentiality is what makes them privileged, meaning you cannot generally be compelled to disclose them. Putting them into a public tool may destroy that confidentiality and may mean the privilege is lost. If you want to use an artificial intelligence tool in connection with your matter, speak to us first.
 
+### Consent to recording and transcription
+
+Before we start, I want to let you know that I am using a tool that records and transcribes this conversation so that I have an accurate note of it. The recording and the transcript go on your file and are treated as confidential in the same way as everything else on it. Are you happy for me to record on that basis? [Record the answer.] Thank you. I am starting the recording now.
+
+Where a participant declines, the tool must not be used and a manual note is taken instead. Where participants are in more than one State, the strictest applicable position governs. See clause 15.4.
+
 ### Letter of instruction to an expert
 
 The court in which this proceeding is brought regulates the use of generative artificial intelligence by expert witnesses. You must not use any generative artificial intelligence tool to draft or prepare the content of your report, or any part of it, without the prior leave of the court. If you have used, or propose to use, any such tool for any purpose connected with your report, including to summarise or analyse material on which you rely, tell us before you proceed so that we can address the position with the court. Your report must state your own opinion and your own process of reasoning, and must comply with [the applicable expert code of conduct or practice note].
@@ -485,7 +527,7 @@ To be completed by the responsible practitioner before restricted information is
 | Item | Detail |
 |---|---|
 | Matter and proceeding number |  |
-| Category of restricted information<br>(clause 7.2(a) to (f)) |  |
+| Category of restricted information<br>(clause 8.2(a) to (f)) |  |
 | Description of the material |  |
 | Tool and version proposed |  |
 | Purpose, confined to this proceeding |  |
@@ -493,7 +535,7 @@ To be completed by the responsible practitioner before restricted information is
 | Basis for satisfaction: supplier bound by confidentiality, no public availability, no training |  |
 | Basis for satisfaction: use confined to this proceeding |  |
 | Basis for satisfaction: no use for training |  |
-| Client informed and consent recorded (clause 11.3) |  |
+| Client informed and consent recorded (clause 12.3) |  |
 | Responsible practitioner and date |  |
 
 ## Schedule 5  Court and tribunal instruments
@@ -516,7 +558,7 @@ The judicial guidelines listed above do not bind practitioners, but they record 
 
 ## Schedule 6  Suitability path
 
-To be worked through before a tool is used on a task. If the answer at any step is no, the tool is not to be used for that task.
+To be worked through before a tool is used on a task. Where the answer at a step is no, do not proceed until the action in the right-hand column has been taken.
 
 |  | Question | If no |
 |---|---|---|
@@ -527,6 +569,8 @@ To be worked through before a tool is used on a task. If the answer at any step 
 | 5 | If restricted information is involved, is there an approval under clause 8 recorded on the file? | Do not use until the approval is given and recorded. |
 | 6 | Are you able to verify the output personally against primary sources, or is a practitioner who can do so reviewing it? | Do not use. Clause 9.2 and 9.6, and clause 13.3. |
 | 7 | Will the use reduce, or at least not increase, the cost to the client? | Reconsider. Clause 14.3. |
+
+Questions 1, 2, 4, 5 and 6 are absolute. Questions 3 and 7 require a judgment to be made and recorded before the task proceeds.
 
 ## Schedule 7  Indicators of unverified or undisclosed use
 
@@ -546,7 +590,87 @@ Expressions or spellings associated with another jurisdiction.
 
 A quotation that is fluent and apt but cannot be located in the source given for it.
 
-## Schedule 8  Quick reference
+## Schedule 8  Application settings
+
+Maintained by the AI Officer and reviewed quarterly. An application not listed here is not approved. Entries record the position established at the date of the last review; every claim about training, retention and data location must be traceable to the evidence file kept under clause 6.11, and not to a supplier's marketing material. Settings named below were verified against supplier documentation at the date of review and are renamed by suppliers more often than this policy is amended.
+
+### Part A  Approved for client information
+
+These applications may be used with client information subject to the settings recorded. Approval for restricted information under clause 8 is stated separately, because it requires the four matters in clause 8.3 to be established.
+
+| Application | Tier required | Settings that must be in force | Restricted information |
+|---|---|---|---|
+| Practice management AI<br>assistant | Included in the practice<br>subscription; admin<br>consent step completed | Supplier confirms in writing that answers are not used to train any model and that data is hosted in Australia. No client-identifying material in free-text queries beyond what the matter requires. | Permitted once the clause 8.3 matters are recorded. Verification under clause 9 applies in full: a legal-sector tool with a sound data posture still fabricates authority. |
+| Legal research platform<br>with AI answers | Firm licence with the<br>Australian hosting term | Written confirmation of Australian hosting and processing, that customer prompts and output are not used for training, and that model calls use zero-retention interfaces. Organisation retention schedule set to the shortest available. | Permitted where the four matters in clause 8.3 are established by the contract. |
+| Microsoft 365 Copilot | Included tenant licence;<br>not enabled by default | Not enabled on client matters until SharePoint and OneDrive permissions have been audited and broad grants removed, restricted search is deployed, sensitivity labels and retention are applied, and Copilot interactions are captured for discovery. Web grounding off for sensitive queries. Confirm tenant data location. | Permitted within the tenant once the permission remediation is complete and recorded. The risk is oversharing rather than training. |
+| General assistant,<br>firm workspace | Team; personal<br>accounts prohibited.<br>See Part E | Training off under the commercial terms and established by the contract, not by a user setting. Retention is thirty days and cannot be shortened on this tier. The feedback, bug and share commands and the session transcript prompt disabled by managed policy, because those channels retain for five years and six months. Single sign-on enforced. Connectors and assistants restricted to those approved. Transmission logging to the practice collector configured. | Permitted where the contractual matters in clause 8.3 are recorded on the file. Clause 8.3 does not require zero retention, and thirty-day retention is neither publication nor training: see clause 8.8. Because zero retention is not available on this tier, the contractual term and the practice transmission record carry the weight, and both must be in place first. Where the client requires that nothing be retained, use the tenancy route below. |
+| Assistant through the<br>firm cloud tenancy | Tenancy in an Australian<br>region | Region pinned to Australia. Prompts and completions remain within the tenancy. Non-essential traffic to the model supplier disabled. Tenancy logging enabled. | Permitted, and the route to use where a client term or the sensitivity of the material requires that the supplier retain nothing. The configuration most readily evidenced under clause 8.3. |
+
+### Part B  Approved for general use only
+
+No client information may be entered into these applications in any form. They are recorded so that their use is governed rather than unexamined.
+
+| Application | Permitted use | Settings that must be in force |
+|---|---|---|
+| Workspace and note<br>platform with AI features | Internal, non-client material only | Enterprise tier with a verified domain so AI features can be governed centrally. Any programme that shares workspace content to improve a supplier model must remain off. Data region confirmed. |
+| Documentation retrieval<br>tool | Library and documentation queries only | Restricted so it cannot receive matter material, through the managed allowlist at Part E. No client information in any query. |
+| Developer assistant in an<br>editor | Practice code, not client matters | Business or Enterprise tier with the privacy setting enforced by administrator policy rather than left to the user. No client documents in the workspace. Absence of an exportable audit record recorded here, which is why it is not approved for client information. |
+| Locally hosted model | Any, including sensitive material | Runs on the device with no network egress. Confirm no telemetry and no cloud synchronisation. Lowest exposure of any option and preferred where the material is sensitive and the task allows it. |
+
+### Part C  Recording, transcription and note-taking
+
+Clause 15 governs use. Consent is required before recording begins, and recording is prohibited in court.
+
+| Application | Status | Settings and conditions |
+|---|---|---|
+| Transcription within the<br>practice conferencing<br>platform | Approved | Automatic transcription and automatic summary off at tenant level. Started by the host only after the consent at clause 15.3 is obtained and noted. Transcript filed to the matter. Preferred because the material stays within the tenant. |
+| Cloud meeting assistant<br>that joins as a participant | Prohibited | These join and record without a positive act by the user, the consent position cannot be controlled by the practice, and the data path and training posture are not administrator-enforced. Not to be installed or connected to a practice account. |
+| Dictation | Approved where<br>on-device | On-device processing only. A dictation service that transmits audio to a supplier is a disclosure and must be entered in Part A before use. |
+| Any recording or<br>transcription in court | Prohibited | See clause 15.5. Leave of the court is required and is not implied by a remote hearing. |
+
+### Part D  Prohibited
+
+These must not be used for any work of the practice. See clause 7.4.
+
+| Application or category | Reason |
+|---|---|
+| Assistants that process and store data in a<br>jurisdiction the practice cannot accept | Where a supplier states that personal data is stored in a jurisdiction from which the practice cannot retrieve it or enforce confidentiality, and reserves the right to train on inputs, no setting cures the position. One such assistant has been prohibited across Australian government entities by direction on security grounds. |
+| Free and personal-subscription tiers of any<br>assistant | The training control is held by the user and can be changed by the user, so the practice cannot be satisfied of the clause 8.3 matters or rely on the setting at all. See clause 6.10. |
+| Meeting assistants that join or record<br>automatically | Recording without a positive act by the user cannot be reconciled with clause 15.3 or with the consent requirements of the relevant State. |
+| Browser extensions that read page content | They transmit whatever is on screen, including another client's material, and the data path cannot be established or controlled. |
+| Any application whose data handling cannot<br>be established | Where a supplier publishes nothing verifiable and will not provide the evidence at Part F, the application cannot be approved. Absence of information is not a neutral position. |
+
+### Part E  Subscription tier and its consequences
+
+The practice holds a Team subscription for its general assistant. A zero retention arrangement is not offered on that tier, so retention by the supplier is thirty days and cannot be shortened by configuration. That is the fixed premise for the rest of this schedule, and it is recorded here rather than in the body of the policy because it will change if the practice changes tier.
+
+What the tier does provide is the commercial terms, under which inputs and outputs are not used to train any model; organisation-level policy control, including the ability to prevent a user enabling the mode that removes permission prompts; and a managed settings file enforced on the device that a user cannot override. That file is delivered by deployment or by device management rather than by the subscription, so the hardening in Part F does not depend on the tier at all.
+
+What the tier does not provide is a zero retention arrangement, and the depth of audit record available above it. The audit record that is available captures access rather than the content of a session, so it does not show what was sent. The practice's own telemetry collector is the substitute, and on this tier it is not optional. What that collector records by default is that a session occurred, when, by whom and how much was sent, and not the content: prompt text is replaced with a redaction marker and only its length is retained, assistant responses are redacted on the same footing, and tool input and tool content are redacted in trace spans. The collector therefore evidences transmission, which is what the third limb of clause 8.8 asks of it. The content records required by clause 9.7 and clause 17.3 are made by hand under clause 17 on the matter file, unless content logging is deliberately enabled, in which case the collector becomes a store of privileged material and is secured, retained and disclosed on the same footing as the matter file.
+
+Two consequences follow, and they are the practical difference between this tier and one with a zero retention arrangement. First, the prompts that offer to send a session transcript to the supplier are suppressed for an organisation holding such an arrangement and are not suppressed here, so the settings that disable the feedback, bug and share commands and the session survey are mandatory rather than prudent. Those channels retain material for five years and six months respectively, well beyond the thirty days that governs the session itself, and they are the only paths by which client material leaves for a materially longer period. Second, where a matter requires that a supplier retain nothing at all, whether because of a term imposed by the client or the sensitivity of the material, the answer is not a setting. It is a different route: a deployment within the practice's own cloud tenancy in an Australian region, redaction before the material is sent, or not using the tool for that matter.
+
+Two surfaces are absent on this tier, which narrows the exposure rather than widening it. Screen control, by which the tool operates the applications on a workstation directly, and the facility that dispatches work from a telephone to a session running on a desktop, are both unavailable on Team and Enterprise subscriptions, each requiring a Pro or Max subscription instead. That position is stated in the supplier's desktop application documentation and the reference is held in the evidence file.
+
+### Part F  Claude Code managed settings
+
+Where Claude Code is used, the practice enforces a managed settings file that a user cannot override. It is deployed to /Library/Application Support/ClaudeCode/managed-settings.json on macOS, C:\Program Files\ClaudeCode\managed-settings.json on Windows, and /etc/claude-code/managed-settings.json on Linux and WSL, or delivered through device management. The settings that must be in force are those that close the channels carrying retention longer than the session itself, and those that prevent a user relaxing the controls.
+
+Non-essential traffic is disabled through CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, with DISABLE_TELEMETRY, DISABLE_ERROR_REPORTING, DISABLE_FEEDBACK_COMMAND and CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY set individually so the position survives a change in what the first variable covers. The feedback, bug and share commands transmit conversation history including file contents and are retained for five years, and an accepted transcript share uploads the session log for up to six months; both channels must be closed.
+
+The local plaintext transcript cache is shortened from its thirty-day default through cleanupPeriodDays, and may be disabled entirely with CLAUDE_CODE_SKIP_PROMPT_HISTORY at the cost of session resumption. That cache location is excluded from consumer file synchronisation under clause 16.3.
+
+Publishing and relay surfaces are closed through disableArtifact, disableRemoteControl, disableClaudeAiConnectors and disableAgentView. Code arriving through plugins, skills, hooks and marketplaces is constrained through disableSkillShellExecution, disableSideloadFlags, strictKnownMarketplaces, allowManagedHooksOnly, allowManagedMcpServersOnly and an allowedMcpServers allowlist. Human approval is preserved through permissions.defaultMode, disableAutoMode and permissions.disableBypassPermissionsMode. Credential and egress paths are denied through permissions.deny. Sign-in is constrained through forceLoginMethod and forceLoginOrgUUID, and forceRemoteSettingsRefresh causes the client to exit rather than run on absent policy.
+
+Telemetry to the practice collector is enabled through CLAUDE_CODE_ENABLE_TELEMETRY together with the exporter, endpoint and protocol variables. Content is gated separately and is redacted unless the gate is set: OTEL_LOG_USER_PROMPTS, OTEL_LOG_ASSISTANT_RESPONSES, OTEL_LOG_TOOL_DETAILS and OTEL_LOG_TOOL_CONTENT each govern a category. The practice leaves all four unset, so the collector evidences transmission and not content, and the content record is made under clause 17. Two features of those gates matter. The assistant response gate follows the prompt gate when it is left unset, so enabling prompt content also enables response content unless the response gate is expressly set to zero. And where sign-in is by OAuth the user email appears in telemetry attributes, which the collector's own retention must account for. If content logging is ever enabled, clause 17.4 applies to the collector.
+
+Because a zero retention arrangement is not available on the practice's tier, the settings in this Part are the whole of the control. The variables that disable the feedback, bug and share commands and the session survey must be in force before Claude Code is used on any client matter, and the practice's own OpenTelemetry collector must be configured, because between them they close the long-retention channels and supply the transmission record that nothing else on this tier provides. See Part E.
+
+### Part G  Evidence required for each entry in Part A
+
+The executed agreement and data processing terms. The term recording that inputs and outputs are not used to train any model. The retention period and the setting that establishes it. The supplier's written statement of where data is processed and stored, and the basis on which Australian Privacy Principle 8 is satisfied if that is outside Australia. The list of sub-processors and confirmation that the training and retention position binds each of them. A record of the administrator-enforced settings as they stand, sufficient to show that they are not user-held. The logging or audit record available to the practice, or a note of its absence.
+
+## Schedule 9  Quick reference
 
 A summary for daily use. It does not replace the policy.
 
@@ -570,7 +694,7 @@ Tell your supervisor when you have used a tool on a document.
 
 If something has gone wrong, tell the AI Officer today. Reporting is not the disciplinary problem. Not reporting is.
 
-## Schedule 9  Acknowledgment
+## Schedule 10  Acknowledgment
 
 I have read the Policy on the Use of Artificial Intelligence in Legal Practice. I understand it, I understand that it applies to my use of artificial intelligence whether on a practice device or my own, and I agree to comply with it. I understand that I must report a suspected breach to the AI Officer on the day I become aware of it.
 
