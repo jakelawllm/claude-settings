@@ -30,19 +30,39 @@ Do not mistake that toggle for compliance. Clause 6.5(b) requires that the suppl
 
 ## What your plan decides
 
-Clause 6 and clause 8 ask different questions, and a plan can pass the first and fail the second. This is the distinction that determines what the tool may be used on.
+Clause 6 and clause 8 ask different questions, and a plan can pass the first and fail the second.
 
 | | Clause 6, approved tool | Clause 8, restricted information |
 |---|---|---|
 | Free, Pro, Max | No. Training is controlled by a user-held toggle, so clause 6.5(b) fails | No |
-| Team | Yes. No training is a term of the commercial contract | **No.** Zero data retention is not available below the enterprise tier, so prompts and outputs are retained for thirty days on infrastructure outside Australia |
-| Enterprise with zero data retention, or an in-region provider deployment | Yes | Capable of satisfying clause 8.3, if the practitioner establishes it and records what establishes it |
+| Team | Yes. No training is a term of the commercial contract | Available, on the conditions below |
+| Enterprise with zero data retention, or a deployment in the practice's own cloud tenancy in an Australian region | Yes | The most readily evidenced route, and the one to use where a client term or the sensitivity of the material requires that the supplier retain nothing |
 
-The default position of this configuration is the middle row, because that is where most practices adopting it will sit. `claudeMd` accordingly states clause 8 material as a prohibition rather than an approval gate. Clause 8.7 already requires that result: where the practitioner cannot be satisfied of each of the four matters, the material is not to be used with any tool, and difficulty in establishing them is a reason not to proceed.
+The middle row is the default assumption of this configuration, because it is where most practices adopting it will sit.
 
-If the practice is on Enterprise with zero data retention granted, or runs Claude Code through Amazon Bedrock, Google Cloud's Agent Platform or Microsoft Foundry with an Australian region and the retention position pinned in the tenancy, the third row may apply. That is a conclusion to reach on the practice's own contract and to record under clause 8.4, not one to inherit from this file. Restore the approval gate in `claudeMd` only after it has been reached.
+A retention period is not publication and it is not training. Paragraph 9A of Practice Note SC Gen 23 asks whether the material stays in a controlled environment, whether the supplier is bound so it is neither made public nor used for training, whether use is confined to the proceeding, and whether it trains the model. It does not ask how long the supplier holds it. The absence of a zero retention arrangement therefore does not by itself defeat clause 8.3, which is why `claudeMd` states an approval gate and not a prohibition.
 
-Australian Privacy Principle 8 sits alongside this and is not answered by retention alone. Sending personal information to United States infrastructure is a disclosure for which the practice remains accountable, and clause 6.5(d) requires the basis for satisfying APP 8 to be recorded before a tool is approved.
+Where zero retention is unavailable, three things carry the satisfaction instead, and all three must be in place before the approval is given:
+
+The contractual term that inputs and outputs are not used to train any model and are not made publicly available. On a commercial plan this is contract, not configuration, and nothing in these files affects it.
+
+The closure of every channel retaining material for longer than the session. That is what the five environment variables at the head of the file do. The feedback, bug and share commands retain for five years and an accepted transcript share for six months, against thirty days for the session itself, so on a plan without zero retention these are the settings that matter most and are mandatory rather than prudent.
+
+The practice being able to show from its own records what was sent and when. This is the one that needs care, and it is dealt with next.
+
+Australian Privacy Principle 8 sits alongside all of this and is not answered by retention either. Sending personal information to United States infrastructure is a disclosure for which the practice remains accountable, and clause 6.5(d) requires the basis for satisfying APP 8 to be recorded before a tool is approved.
+
+## What the telemetry record actually contains
+
+The five OpenTelemetry keys give the practice its own record of sessions, and that record is the third limb above. It is important to be exact about what it holds, because it is easy to assume it holds more.
+
+By default it does not contain what was sent. Claude Code redacts user prompt text, tool input details and tool content from telemetry unless the corresponding variables are set; what the collector receives for a prompt is `user_prompt_length`, the length in characters. The default record therefore establishes that a session occurred, when, on which machine, and how much was sent. It does not establish the content, and it does not contain model output at all.
+
+That is still a real record, and for most purposes it is the right one: it evidences the fact and timing of transmission without creating a second copy of the client's material.
+
+Where the content itself must be recoverable, there are three routes and they should be chosen deliberately rather than by default. `OTEL_LOG_USER_PROMPTS` and `OTEL_LOG_ASSISTANT_RESPONSES` make the collector hold the conversation, which means the collector becomes a repository of privileged material and must be secured, retained and disclosed on the same footing as the matter file. The local transcript holds the session but expires on `cleanupPeriodDays`, set to seven here, and is disabled entirely by `CLAUDE_CODE_SKIP_PROMPT_HISTORY`. Or the record is made by hand on the matter file, which is what a clause 17 record and a Schedule 2 form are for.
+
+Decide which of those applies before relying on the collector to discharge an obligation to identify what a tool produced and how it was verified. All three can be off at once without anything announcing it.
 
 Exclude the `.claude` directory from OneDrive, Dropbox, iCloud Drive, roaming profiles and any consumer backup agent, and keep whole-disk encryption on. Session transcripts are written there in plaintext. They are the firm's own records on the firm's own machine, so they are not a disclosure to anyone, but a sync client that replicates the home directory turns them into one by a route nobody assessed.
 
