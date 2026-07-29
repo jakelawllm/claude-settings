@@ -17,7 +17,7 @@
   "cleanupPeriodDays": 7,
   "feedbackSurveyRate": 0,
   "autoUpdatesChannel": "stable",
-  "requiredMinimumVersion": "2.1.207",
+  "requiredMinimumVersion": "2.1.219",
   "forceLoginMethod": "claudeai",
   "forceRemoteSettingsRefresh": true,
   "disableArtifact": true,
@@ -40,11 +40,7 @@
   "enableAllProjectMcpServers": false,
   "allowManagedMcpServersOnly": true,
   "allowManagedHooksOnly": true,
-  "allowedMcpServers": [
-    {
-      "serverName": "context7"
-    }
-  ],
+  "allowedMcpServers": [],
   "permissions": {
     "defaultMode": "default",
     "disableBypassPermissionsMode": "disable",
@@ -93,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:\\Program Files\\ClaudeCode\\hooks\\matter-guard.js\""
+            "command": "node \"/etc/claude-code/hooks/matter-guard.js\""
           }
         ]
       }
@@ -103,7 +99,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:\\Program Files\\ClaudeCode\\hooks\\matter-guard.js\""
+            "command": "node \"/etc/claude-code/hooks/matter-guard.js\""
           }
         ]
       }
@@ -113,10 +109,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"C:\\Program Files\\ClaudeCode\\hooks\\matter-guard.js\""
+            "command": "node \"/etc/claude-code/hooks/matter-guard.js\""
           }
         ]
       }
     ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false
   }
 }

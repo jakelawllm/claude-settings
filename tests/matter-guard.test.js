@@ -1,63 +1,36 @@
 /**
  * Tests for hooks/matter-guard.js.
  *
- *   node tests/matter-guard.test.js hooks/matter-guard.js
+ *   node tests/matter-guard.test.js
  *
- * The hook is driven as a child process with real JSON payloads, deliberately:
- * an earlier shell-based harness reported false passes twice, once because a
- * synchronous stdin read throws on Windows and once because asynchronous
- * stdout writes were lost through command substitution. Both looked like
- * "allowed", which is the dangerous direction for a control of this kind.
+ * The hook is driven as a child process with real JSON payloads, and the suite
+ * builds its own temporary matters tree and state directory. It depends on no
+ * environment variable, so the documented command runs unchanged on Windows,
+ * macOS and Linux.
  *
- * Regressions for bugs this harness found: case 2, the same matter reached by
- * a second alias was denied; case 11, a path leaving the bound matter via ".."
- * was allowed; case 17, the archive wrote to the identity token rather than a
- * real directory; case 20, the central archive sat outside the boundary so any
- * session could read every matter's records.
+ * Several cases are regressions for defects found in earlier drafts, marked
+ * below. Every one of them failed in the direction that looks like "allowed",
+ * which is why this suite asserts refusals rather than absence of output.
  */
+
+'use strict';
+
 const { spawnSync } = require('child_process');
-const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 
-const HOOK = process.argv[2] || 'hooks/matter-guard.js';
-const ROOT = '\\\\nas.example.invalid\\matters';
-const ALIAS = '\\\\nas-alias.example.invalid\\matters';
+const HOOK = process.argv[2] || path.join(__dirname, '..', 'hooks', 'matter-guard.js');
+const LINK_TYPE = process.platform === 'win32' ? 'junction' : 'dir';
 
-const env = {
-  ...process.env,
-  CLAUDE_MATTER_ROOTS: [ROOT, ALIAS, 'Z:\\matters'].join(';'),
-};
-
-const stateDir = path.join(process.env.LOCALAPPDATA, 'claude-matter-guard');
-fs.rmSync(stateDir, { recursive: true, force: true });
-
-function call(ev) {
-  const r = spawnSync(process.execPath, [HOOK], {
-    input: JSON.stringify(ev),
-    encoding: 'utf8',
-    env,
-  });
-  if (r.stderr && r.stderr.trim()) console.log('   stderr:', r.stderr.trim());
-  try {
-    return JSON.parse(r.stdout);
-  } catch {
-    return { _raw: r.stdout };
-  }
-}
-
-function pre(session, tool, target, cwd) {
-  const key = tool === 'Grep' || tool === 'Glob' ? 'path' : 'file_path';
-  return call({
-    hook_event_name: 'PreToolUse',
-    session_id: session,
-    tool_name: tool,
-    tool_input: { [key]: target },
-    cwd,
-  });
-}
-
-const decision = (o) =>
-  (o.hookSpecificOutput && o.hookSpecificOutput.permissionDecision) || 'allow';
+const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'mg-'));
+const MATTERS = path.join(TMP, 'matters');
+const SMITH = path.join(MATTERS, 'Smith');
+const JONES = path.join(MATTERS, 'Jones');
+const STATE = path.join(TMP, 'state');
+for (const d of [MATTERS, SMITH, JONES]) fs.mkdirSync(d, { recursive: true });
+fs.writeFileSync(path.join(SMITH, 'a.txt'), 'a');
+fs.writeFileSync(path.join(JONES, 'b.txt'), 'b');
 
 let pass = 0;
 let fail = 0;
@@ -65,170 +38,226 @@ function check(label, got, want) {
   const ok = got === want;
   ok ? pass++ : fail++;
   console.log(
-    `${ok ? 'PASS' : 'FAIL'}  ${label.padEnd(44)} want=${want.padEnd(5)} got=${got}`
+    `${ok ? 'PASS' : 'FAIL'}  ${label.padEnd(46)} want=${String(want).padEnd(6)} got=${got}`
   );
 }
 
-const SMITH = ROOT + '\\Smith';
-const JONES = ROOT + '\\Jones';
+function baseEnv(over) {
+  return {
+    ...process.env,
+    CLAUDE_MATTER_ROOTS: MATTERS,
+    CLAUDE_MATTER_MODE: 'enforce',
+    CLAUDE_MATTER_STATE_DIR: STATE,
+    CLAUDE_RECORD_ROOT: '',
+    ...over,
+  };
+}
 
-check('1 first touch binds Smith', decision(pre('s1', 'Read', SMITH + '\\brief.docx', SMITH)), 'allow');
-check('2 same matter via second alias', decision(pre('s1', 'Read', ALIAS + '\\Smith\\adv.docx', SMITH)), 'allow');
-check('3 second matter Jones', decision(pre('s1', 'Read', JONES + '\\f.docx', SMITH)), 'deny');
-check('4 second matter, mapped drive', decision(pre('s1', 'Grep', 'Z:\\matters\\Jones', SMITH)), 'deny');
-check('5 second matter, \\\\?\\UNC form', decision(pre('s1', 'Read', '\\\\?\\UNC\\nas.example.invalid\\matters\\Jones\\f.docx', SMITH)), 'deny');
-check('6 case variant, same matter', decision(pre('s1', 'Read', ROOT.toUpperCase() + '\\SMITH\\x.docx', SMITH)), 'allow');
-check('7 non-client path', decision(pre('s1', 'Read', 'C:\\Users\\jacob\\notes.md', SMITH)), 'allow');
-check('8 lookalike sibling root', decision(pre('s1', 'Read', ROOT + '-old\\Jones\\f.docx', SMITH)), 'allow');
-check('9 Write into second matter', decision(pre('s1', 'Write', JONES + '\\new.txt', SMITH)), 'deny');
-check('10 separate session, own matter', decision(pre('s2', 'Read', JONES + '\\f.docx', JONES)), 'allow');
-check('11 traversal out of bound matter', decision(pre('s1', 'Read', SMITH + '\\..\\Jones\\f.docx', SMITH)), 'deny');
-
-// Fail-closed: installed but unconfigured must refuse, not quietly allow.
-{
-  const bare = { ...process.env };
-  delete bare.CLAUDE_MATTER_ROOTS;
+function call(ev, env, rawInput) {
   const r = spawnSync(process.execPath, [HOOK], {
-    input: JSON.stringify({
-      hook_event_name: 'PreToolUse',
-      session_id: 's3',
-      tool_name: 'Read',
-      tool_input: { file_path: 'C:\\anything.txt' },
-      cwd: 'C:\\tmp',
-    }),
+    input: rawInput !== undefined ? rawInput : JSON.stringify(ev),
     encoding: 'utf8',
-    env: bare,
+    env: env || baseEnv(),
   });
-  let out = {};
   try {
-    out = JSON.parse(r.stdout);
+    return JSON.parse(r.stdout);
   } catch {
-    /* leave empty: parses as allow, which fails the check as it should */
+    return {};
   }
-  check('12 unconfigured guard fails closed', decision(out), 'deny');
 }
 
-// Warn mode allows the cross-matter access but must still say something.
-{
-  const w = { ...env, CLAUDE_MATTER_MODE: 'warn' };
-  const call2 = (ev, e) => {
-    const r = spawnSync(process.execPath, [HOOK], {
-      input: JSON.stringify(ev), encoding: 'utf8', env: e,
-    });
-    try { return JSON.parse(r.stdout); } catch { return {}; }
-  };
-  const bind = { hook_event_name: 'PreToolUse', session_id: 'w1', tool_name: 'Read',
-                 tool_input: { file_path: SMITH + '\\a.docx' }, cwd: SMITH };
-  call2(bind, w);
-  const cross = { ...bind, tool_input: { file_path: JONES + '\\b.docx' } };
-  const out = call2(cross, w);
-  check('13 warn mode allows', decision(out), 'allow');
-  check('14 warn mode still reports', out.systemMessage ? 'yes' : 'no', 'yes');
+const decision = (o) =>
+  (o.hookSpecificOutput && o.hookSpecificOutput.permissionDecision) || 'allow';
+
+function pre(session, tool, target, cwd, env) {
+  const key = tool === 'Grep' || tool === 'Glob' ? 'path' : 'file_path';
+  return call(
+    {
+      hook_event_name: 'PreToolUse',
+      session_id: session,
+      tool_name: tool,
+      tool_input: { [key]: target },
+      cwd,
+    },
+    env
+  );
 }
 
-// Off mode does nothing at all.
-{
-  const o = { ...env, CLAUDE_MATTER_MODE: 'off' };
-  const r = spawnSync(process.execPath, [HOOK], {
-    input: JSON.stringify({ hook_event_name: 'PreToolUse', session_id: 'o1',
-      tool_name: 'Read', tool_input: { file_path: JONES + '\\b.docx' }, cwd: SMITH }),
-    encoding: 'utf8', env: o,
-  });
-  check('15 off mode is silent', r.stdout.trim() === '' ? 'silent' : 'spoke', 'silent');
+const freshState = () => fs.rmSync(STATE, { recursive: true, force: true });
+
+// -- separation ------------------------------------------------------------
+
+freshState();
+check('01 first touch binds Smith', decision(pre('s1', 'Read', path.join(SMITH, 'a.txt'), SMITH)), 'allow');
+check('02 same matter again', decision(pre('s1', 'Read', path.join(SMITH, 'a.txt'), SMITH)), 'allow');
+check('03 second matter is refused', decision(pre('s1', 'Read', path.join(JONES, 'b.txt'), SMITH)), 'deny');
+check('04 Write into second matter', decision(pre('s1', 'Write', path.join(JONES, 'n.txt'), SMITH)), 'deny');
+check('05 Grep across second matter', decision(pre('s1', 'Grep', JONES, SMITH)), 'deny');
+check(
+  '06 traversal out of bound matter',
+  decision(pre('s1', 'Read', path.join(SMITH, '..', 'Jones', 'b.txt'), SMITH)),
+  'deny'
+);
+check('07 non-client path untouched', decision(pre('s1', 'Read', path.join(TMP, 'x.md'), SMITH)), 'allow');
+check('08 matters root is not a matter', decision(pre('s9', 'Glob', MATTERS, TMP)), 'allow');
+check('09 separate session binds separately', decision(pre('s2', 'Read', path.join(JONES, 'b.txt'), JONES)), 'allow');
+
+// Regression: identity was the full path, so the same matter reached by a
+// second alias for the share compared unequal and was refused.
+const ALIAS = path.join(TMP, 'matters-alias');
+let aliasMade = true;
+try {
+  fs.symlinkSync(MATTERS, ALIAS, LINK_TYPE);
+} catch {
+  aliasMade = false;
+}
+if (aliasMade) {
+  freshState();
+  const env = baseEnv({ CLAUDE_MATTER_ROOTS: [MATTERS, ALIAS].join(';') });
+  pre('s3', 'Read', path.join(SMITH, 'a.txt'), SMITH, env);
+  check('10 same matter via second alias', decision(pre('s3', 'Read', path.join(ALIAS, 'Smith', 'a.txt'), SMITH, env)), 'allow');
+  check('11 other matter via second alias', decision(pre('s3', 'Read', path.join(ALIAS, 'Jones', 'b.txt'), SMITH, env)), 'deny');
+} else {
+  console.log('SKIP  10-11 alias cases (link creation unavailable)');
 }
 
-// Unconfigured + warn must stand down rather than fail closed.
-{
-  const bare = { ...process.env, CLAUDE_MATTER_MODE: 'warn' };
-  delete bare.CLAUDE_MATTER_ROOTS;
-  const r = spawnSync(process.execPath, [HOOK], {
-    input: JSON.stringify({ hook_event_name: 'PreToolUse', session_id: 'w2',
-      tool_name: 'Read', tool_input: { file_path: 'C:\\x.txt' }, cwd: 'C:\\tmp' }),
-    encoding: 'utf8', env: bare,
-  });
-  let out = {}; try { out = JSON.parse(r.stdout); } catch {}
-  check('16 unconfigured + warn does not block', decision(out), 'allow');
+// Regression (H-01): a path lexically inside the bound matter that links out.
+const ESCAPE = path.join(SMITH, 'shortcut');
+let linkMade = true;
+try {
+  fs.symlinkSync(JONES, ESCAPE, LINK_TYPE);
+} catch {
+  linkMade = false;
+}
+if (linkMade) {
+  freshState();
+  pre('s4', 'Read', path.join(SMITH, 'a.txt'), SMITH);
+  check('12 symlink out of bound matter', decision(pre('s4', 'Read', path.join(ESCAPE, 'b.txt'), SMITH)), 'deny');
+} else {
+  console.log('SKIP  12 symlink escape (link creation unavailable)');
 }
 
-// SessionEnd must resolve a real directory, not the identity token.
-{
-  const os = require('os');
-  const fakeMatter = path.join(os.tmpdir(), 'guard-archive-test', 'Smith');
-  fs.mkdirSync(fakeMatter, { recursive: true });
-  const tr = path.join(os.tmpdir(), 'guard-archive-test', 'transcript.jsonl');
-  fs.writeFileSync(tr, '{"x":1}\n');
-  const localRoot = path.join(os.tmpdir(), 'guard-archive-test');
-  const e2 = { ...env, CLAUDE_MATTER_ROOTS: localRoot };
-  spawnSync(process.execPath, [HOOK], {
-    input: JSON.stringify({ hook_event_name: 'PreToolUse', session_id: 'a1',
-      tool_name: 'Read', tool_input: { file_path: path.join(fakeMatter, 'f.txt') },
-      cwd: fakeMatter }), encoding: 'utf8', env: e2 });
-  spawnSync(process.execPath, [HOOK], {
-    input: JSON.stringify({ hook_event_name: 'SessionEnd', session_id: 'a1',
-      cwd: fakeMatter, transcript_path: tr, reason: 'other' }),
-    encoding: 'utf8', env: e2 });
-  const archived = fs.existsSync(path.join(fakeMatter, '_ai-record'))
-    && fs.readdirSync(path.join(fakeMatter, '_ai-record')).length > 0;
-  check('17 transcript filed to matter folder', archived ? 'filed' : 'missing', 'filed');
+// -- configuration faults: every one fails closed in enforce ---------------
 
-  const central = path.join(os.tmpdir(), 'guard-archive-test', 'central');
-  const e3 = { ...e2, CLAUDE_RECORD_ROOT: central };
-  spawnSync(process.execPath, [HOOK], {
-    input: JSON.stringify({ hook_event_name: 'SessionEnd', session_id: 'a1',
-      cwd: fakeMatter, transcript_path: tr, reason: 'other' }),
-    encoding: 'utf8', env: e3 });
-  const centralOk = fs.existsSync(path.join(central, 'smith'))
-    && fs.readdirSync(path.join(central, 'smith')).length > 0;
-  check('18 transcript filed to central archive', centralOk ? 'filed' : 'missing', 'filed');
+const PLACEHOLDER = 'REPLACE-WITH-YOUR-MATTERS-ROOT-AND-EVERY-ALIAS-SEMICOLON-SEPARATED';
+freshState();
+check(
+  '13 shipped placeholder refuses (H-02)',
+  decision(pre('s5', 'Read', path.join(JONES, 'b.txt'), SMITH, baseEnv({ CLAUDE_MATTER_ROOTS: PLACEHOLDER }))),
+  'deny'
+);
+check(
+  '14 roots unset refuses',
+  decision(pre('s5', 'Read', path.join(JONES, 'b.txt'), SMITH, baseEnv({ CLAUDE_MATTER_ROOTS: '' }))),
+  'deny'
+);
+check(
+  '15 relative root refuses',
+  decision(pre('s5', 'Read', path.join(JONES, 'b.txt'), SMITH, baseEnv({ CLAUDE_MATTER_ROOTS: 'matters' }))),
+  'deny'
+);
+check(
+  '16 unreachable root refuses',
+  decision(pre('s5', 'Read', path.join(JONES, 'b.txt'), SMITH, baseEnv({ CLAUDE_MATTER_ROOTS: path.join(TMP, 'nope') }))),
+  'deny'
+);
+check('17 malformed input refuses (C-01)', decision(call(null, baseEnv(), 'not json at all')), 'deny');
+
+const BLOCKED = path.join(TMP, 'blocked-state');
+fs.writeFileSync(BLOCKED, 'a file where the directory must go');
+check(
+  '18 unwritable state refuses (C-01)',
+  decision(pre('s6', 'Read', path.join(SMITH, 'a.txt'), SMITH, baseEnv({ CLAUDE_MATTER_STATE_DIR: BLOCKED }))),
+  'deny'
+);
+
+freshState();
+pre('s7', 'Read', path.join(SMITH, 'a.txt'), SMITH);
+fs.writeFileSync(path.join(STATE, 's7.json'), '{ this is not json');
+check('19 corrupt state refuses (C-01)', decision(pre('s7', 'Read', path.join(SMITH, 'a.txt'), SMITH)), 'deny');
+
+// -- modes -----------------------------------------------------------------
+
+freshState();
+const WARN = baseEnv({ CLAUDE_MATTER_MODE: 'warn' });
+pre('w1', 'Read', path.join(SMITH, 'a.txt'), SMITH, WARN);
+const warned = pre('w1', 'Read', path.join(JONES, 'b.txt'), SMITH, WARN);
+check('20 warn allows the crossing', decision(warned), 'allow');
+check('21 warn still reports it', warned.systemMessage ? 'yes' : 'no', 'yes');
+check(
+  '22 warn stands down on bad config',
+  decision(pre('w2', 'Read', path.join(JONES, 'b.txt'), SMITH, baseEnv({ CLAUDE_MATTER_MODE: 'warn', CLAUDE_MATTER_ROOTS: PLACEHOLDER }))),
+  'allow'
+);
+const offRun = spawnSync(process.execPath, [HOOK], {
+  input: JSON.stringify({
+    hook_event_name: 'PreToolUse',
+    session_id: 'o1',
+    tool_name: 'Read',
+    tool_input: { file_path: path.join(JONES, 'b.txt') },
+    cwd: SMITH,
+  }),
+  encoding: 'utf8',
+  env: baseEnv({ CLAUDE_MATTER_MODE: 'off' }),
+});
+check('23 off mode is silent', offRun.stdout.trim() === '' ? 'silent' : 'spoke', 'silent');
+
+// -- archiving -------------------------------------------------------------
+
+freshState();
+const transcript = path.join(TMP, 'transcript.jsonl');
+fs.writeFileSync(transcript, '{"x":1}\n');
+pre('a1', 'Read', path.join(SMITH, 'a.txt'), SMITH);
+call({ hook_event_name: 'SessionEnd', session_id: 'a1', cwd: SMITH, transcript_path: transcript, reason: 'other' });
+const inMatter = path.join(SMITH, '_ai-record');
+// Regression (C-02): the POSIX root was stripped, so an absolute matter path
+// resolved relative to the process working directory and the record was filed
+// into the wrong place entirely.
+check(
+  '24 record filed inside the matter',
+  fs.existsSync(inMatter) && fs.readdirSync(inMatter).length > 0 ? 'filed' : 'missing',
+  'filed'
+);
+check(
+  '25 no partial file left behind',
+  fs.existsSync(inMatter) && fs.readdirSync(inMatter).some((f) => f.endsWith('.part')) ? 'partial' : 'clean',
+  'clean'
+);
+
+const CENTRAL = path.join(TMP, 'archive');
+freshState();
+const envC = baseEnv({ CLAUDE_RECORD_ROOT: CENTRAL });
+pre('a2', 'Read', path.join(SMITH, 'a.txt'), SMITH, envC);
+call(
+  { hook_event_name: 'SessionEnd', session_id: 'a2', cwd: SMITH, transcript_path: transcript, reason: 'other' },
+  envC
+);
+check(
+  '26 record filed to central archive',
+  fs.existsSync(CENTRAL) && fs.readdirSync(CENTRAL).length > 0 ? 'filed' : 'missing',
+  'filed'
+);
+// The archive holds every matter's records, so it must be inside the boundary.
+freshState();
+fs.mkdirSync(path.join(CENTRAL, 'Jones'), { recursive: true });
+pre('a3', 'Read', path.join(SMITH, 'a.txt'), SMITH, envC);
+check(
+  '27 other matter archive refused',
+  decision(pre('a3', 'Read', path.join(CENTRAL, 'Jones', 's.jsonl'), SMITH, envC)),
+  'deny'
+);
+
+// -- state hygiene (H-03) --------------------------------------------------
+
+if (process.platform !== 'win32') {
+  freshState();
+  pre('p1', 'Read', path.join(SMITH, 'a.txt'), SMITH);
+  check('28 state directory is private', (fs.statSync(STATE).mode & 0o777).toString(8), '700');
+  check('29 state file is private', (fs.statSync(path.join(STATE, 'p1.json')).mode & 0o777).toString(8), '600');
+} else {
+  console.log('SKIP  28-29 POSIX permission bits (Windows uses ACLs)');
 }
-
-// The central archive holds every matter's records in one place, so it must
-// be inside the boundary too, not treated as ordinary non-client storage.
-{
-  const ARCHIVE = '\\\\nas.example.invalid\\ai-records';
-  const a = { ...env, CLAUDE_RECORD_ROOT: ARCHIVE };
-  const callA = (ev) => {
-    const r = spawnSync(process.execPath, [HOOK], {
-      input: JSON.stringify(ev), encoding: 'utf8', env: a,
-    });
-    try { return JSON.parse(r.stdout); } catch { return {}; }
-  };
-  const bind = { hook_event_name: 'PreToolUse', session_id: 'arch1', tool_name: 'Read',
-                 tool_input: { file_path: SMITH + '\\a.docx' }, cwd: SMITH };
-  callA(bind);
-  check('19 own matter archive readable',
-    decision(callA({ ...bind, tool_input: { file_path: ARCHIVE + '\\Smith\\s.jsonl' } })), 'allow');
-  check('20 other matter archive blocked',
-    decision(callA({ ...bind, tool_input: { file_path: ARCHIVE + '\\Jones\\s.jsonl' } })), 'deny');
-}
-
-// Archive nested inside the matters root: the longer root must win, or the
-// archive's own folder name is mistaken for a matter.
-{
-  const NESTED = ROOT + '\\_ai-records';
-  const n = { ...env, CLAUDE_RECORD_ROOT: NESTED };
-  const callN = (ev) => {
-    const r = spawnSync(process.execPath, [HOOK], {
-      input: JSON.stringify(ev), encoding: 'utf8', env: n,
-    });
-    try { return JSON.parse(r.stdout); } catch { return {}; }
-  };
-  const bind = { hook_event_name: 'PreToolUse', session_id: 'arch2', tool_name: 'Read',
-                 tool_input: { file_path: SMITH + '\\a.docx' }, cwd: SMITH };
-  callN(bind);
-  check('21 nested archive, own matter',
-    decision(callN({ ...bind, tool_input: { file_path: NESTED + '\\Smith\\s.jsonl' } })), 'allow');
-  check('22 nested archive, other matter',
-    decision(callN({ ...bind, tool_input: { file_path: NESTED + '\\Jones\\s.jsonl' } })), 'deny');
-}
-
-console.log('\nbinding state:');
-for (const f of fs.readdirSync(stateDir)) {
-  console.log('  ', f, fs.readFileSync(path.join(stateDir, f), 'utf8'));
-}
-
-const d = pre('s1', 'Read', JONES + '\\f.docx', SMITH);
-console.log('\ndeny reason:\n ', d.hookSpecificOutput.permissionDecisionReason);
 
 console.log(`\npassed=${pass} failed=${fail}`);
+fs.rmSync(TMP, { recursive: true, force: true });
 process.exit(fail ? 1 : 0);

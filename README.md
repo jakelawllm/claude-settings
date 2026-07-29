@@ -10,6 +10,16 @@ This repository is an attempt to occupy that gap: to take the obligations as the
 
 It is offered for comparison and adaptation. It is a configuration baseline, not legal advice, and it does not replace a retainer term, a costs disclosure, a firm policy or a professional judgment about a particular matter.
 
+> **Status: beta reference implementation. Not a production compliance package.**
+>
+> This has not had independent security or legal review. Read these three limits before relying on any of it.
+>
+> **The matter guard is not a security boundary on its own.** It constrains the model, not a determined user, and it does not parse shell commands: a Bash command can still address another matter directly. What contains Bash is the operating system sandbox, enabled in `managed-settings.json`.
+>
+> **Native Windows is not a supported platform for matter isolation.** The sandbox does not run there. The shipped settings set `failIfUnavailable`, so Claude Code will refuse to start rather than run without the boundary it claims. Use macOS, Linux, or Windows with Claude Code inside WSL2.
+>
+> **The tool list is fixed.** New built-in tools, plugin tools and MCP tools fall outside the guard until it is updated for them.
+
 ## Contents
 
 `managed-settings.json` is the organisation-level policy. It is enforced above user and project settings and cannot be overridden by staff, which is what makes it useful for supervision under rule 37 of the Legal Profession Uniform Law Australian Solicitors' Conduct Rules 2015.
@@ -19,6 +29,8 @@ It is offered for comparison and adaptation. It is a configuration baseline, not
 `matter-settings.json` is an optional per-matter file, placed at `.claude/settings.json` inside a matter folder, which denies the web tools for work where nothing should be reaching outward.
 
 `skills/ai-policy-compliance/SKILL.md` is the conduct layer. The settings decide what the tool may do; the skill decides what may be produced and what must be said about it. It refuses to draft the content of evidence, stops and asks when material looks like clause 8 restricted information, requires a verification worklist and a Schedule 2 record with any draft that cites authority, and refuses to tell a practitioner that a citation has been checked. Deploy it at the enterprise level, alongside the managed settings file, where it overrides a personal or project skill of the same name so a user cannot shadow it.
+
+`SECURITY.md` states what is and is not a security boundary here, and how to report a finding privately. `CONTRIBUTING.md` records that contributions are not accepted. `CHANGELOG.md` tracks the changes. `.github/workflows/ci.yml` runs the hook tests on Windows, macOS and Linux, validates the JSON, regenerates the policy Markdown from the DOCX and fails on drift, checks that every clause reference resolves, and scans the full history for secrets.
 
 `hooks/matter-guard.js` keeps one session to one matter and files the session record to the matter folder. It is the only part of this repository that enforces something the settings keys cannot express, and it is wired up in `managed-settings.json`. `tests/matter-guard.test.js` is its test suite; run it before deploying a change to the hook, because two of its cases exist for bugs that were live in earlier drafts.
 
@@ -95,6 +107,15 @@ The skill and the hook go into the same system directory as the organisation fil
 <system directory>/hooks/matter-guard.js
 ```
 
+The `hooks` block in `managed-settings.json` ships with the Linux and WSL path, `node "/etc/claude-code/hooks/matter-guard.js"`, because that is where the sandbox runs. A managed settings file is plain JSON with no variable expansion, so the command is a literal path and **must be edited for the platform it is deployed to**:
+
+```
+macOS      node "/Library/Application Support/ClaudeCode/hooks/matter-guard.js"
+Linux/WSL  node "/etc/claude-code/hooks/matter-guard.js"
+```
+
+Deploying the file unedited to macOS silently disables the guard: the hook command fails to launch and the session continues. Run the verification below on one machine per platform before the fleet.
+
 A skill in that directory is the enterprise level, and it overrides a personal or project skill of the same name, so a practitioner cannot shadow it with a laxer copy. The `hooks` block in `managed-settings.json` points at the path above; change it there if you deploy the script elsewhere. The hook needs Node on the machine.
 
 Two settings decide how firmly this holds. `allowManagedHooksOnly` is already set, so only managed hooks load and a user cannot disable the guard by editing their own settings. `strictPluginOnlyCustomization` is not set here: it blocks skills, agents, hooks and MCP servers from user and project sources so they can come only from plugins or managed settings, and it accepts an array such as `["skills", "hooks"]` to lock named surfaces rather than all four. Consider it if a practitioner adding their own skills is a concern; leave it off if it is not, because it also stops legitimate local tooling.
@@ -111,7 +132,9 @@ Two settings decide how firmly this holds. `allowManagedHooksOnly` is already se
 
 `OTEL_EXPORTER_OTLP_ENDPOINT` carries a placeholder. Point the five OpenTelemetry keys at your collector. Claude audit logs record access metadata and not conversation content, so your own collector is the only record of what was sent, to which endpoint, on what date, and that record is what you would rely on if a claim of privilege or compliance with the Harman undertaking is contested. Clause 6.5(h) requires that what logging is available to the practice be established before a tool is approved, and clause 17.5 requires that a tool which cannot produce a record of what was sent to it have that limitation recorded in Schedules 1 and 8. The five keys are what stop that limitation applying. Deleting them is a choice to record it.
 
-`allowedMcpServers` is an allowlist operating together with `allowManagedMcpServersOnly`. Anything not named is blocked. Replace the example entry with the servers you actually sanction. An MCP server is itself a tool for the purposes of clause 6, so each one named here needs an assessment under clause 6.5 and an entry in Schedule 1 before it is added, not after.
+`allowedMcpServers` ships **empty**, so no MCP server loads. That is deliberate. An entry of the form `{"serverName": "context7"}` matches a display name, and a display name is chosen by whoever configures the server: a different server presenting the same name satisfies the rule. Anthropic's managed MCP documentation recommends `serverUrl` where the match must survive a rename, and the same reasoning applies to an allowlist. Identify an approved server by its exact URL or command, not its label. An MCP server is itself a tool for the purposes of clause 6, so each one needs an assessment under clause 6.5 and an entry in Schedule 1 before it is added, not after.
+
+`sandbox` is enabled, with `failIfUnavailable` and `allowUnsandboxedCommands: false`. This is the only part of the baseline the operating system enforces rather than the client, and it is what actually contains a Bash command. `failIfUnavailable` means Claude Code refuses to start where the sandbox cannot run, which on native Windows is always. That is the intended behaviour: a session that silently continues without the boundary is worse than one that will not start. If a practice accepts the weaker position, set `failIfUnavailable` to `false` and treat matter isolation as advisory on that machine — and say so in Schedule 8.
 
 `requiredMinimumVersion` blocks startup below the stated version. Confirm the fleet is at or above it before pushing, or drop to `minimumVersion`, which governs updates without blocking a session.
 
@@ -128,10 +151,11 @@ Managed settings parse tolerantly, so one bad entry is stripped rather than void
 `claude doctor` validates settings keys. It does not exercise the hook, which is ordinary code and fails in ordinary ways. Run its tests separately:
 
 ```
-node tests/matter-guard.test.js hooks/matter-guard.js
+node tests/matter-guard.test.js
+python scripts/check-clause-refs.py
 ```
 
-Twenty-two cases, and they must all pass. A hook that crashes or is misconfigured is not obviously broken from inside a session: in `warn` it says nothing, and in `enforce` a fault that stops it running removes the boundary rather than announcing itself. The suite is the only thing that tells you the guard still works.
+Every case must pass. Two cases are skipped on Windows, where POSIX permission bits do not apply; CI runs them on Linux and macOS. A hook that crashes or is misconfigured is not obviously broken from inside a session: in `warn` it says nothing, and in `enforce` a fault that stops it running removes the boundary rather than announcing itself. The suite is the only thing that tells you the guard still works.
 
 ## What the settings do
 
@@ -158,7 +182,9 @@ Twenty-two cases, and they must all pass. A hook that crashes or is misconfigure
 
 `claudeMd` tells the practitioner to confine a session to one matter. That is an instruction, and an instruction is not a control. `hooks/matter-guard.js` is the control.
 
-It cannot do quite what you would expect. A `SessionStart` hook cannot block a session from starting, so nothing prevents a session being opened in the wrong place. What `PreToolUse` can do is block a tool call, and that yields a better guarantee than the one it replaces: not one session per matter, but **no session that touches two matters**. The first client path a session touches binds it, and every later path under a different matter is refused, whatever the session was doing beforehand.
+It cannot do quite what you would expect. A `SessionStart` hook cannot block a session from starting, so nothing prevents a session being opened in the wrong place. What `PreToolUse` can do is block a tool call. The first client path a session touches binds it, and every later path under a different matter is refused through the file tools, whatever the session was doing beforehand.
+
+That is narrower than "no session touches two matters", and the difference matters. The guard covers a fixed list of file tools. It does not parse Bash commands, so a shell command can address another matter by absolute path; containment of Bash comes from the sandbox, not from here. It also does not cover tools it has not been told about, including new built-ins, plugin tools and MCP tools. Where the sandbox cannot run, the guard is advisory for those routes.
 
 The guard runs on three events. `PreToolUse` does the enforcement across Read, Edit, Write, NotebookEdit, Grep, Glob and Bash. `SessionEnd` files the completed transcript into the matter folder, which is what makes the session record a record of the matter rather than a cache in a user profile. `SessionStart` names the bound matter as context, and is advisory only.
 
