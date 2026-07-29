@@ -55,13 +55,24 @@ const STATE_DIR = path.join(
 );
 const AUDIT_LOG = path.join(STATE_DIR, 'would-have-blocked.log');
 
-/** Paths under these are client material. Compared canonically, never raw. */
+/**
+ * Paths under these are client material. Compared canonically, never raw.
+ *
+ * The record archive is included. It is organised by matter exactly as the
+ * matters root is, and it holds every matter's transcripts in one place, so
+ * without it a session bound to one matter could read every other matter's
+ * session records simply because they sit outside the matters root.
+ *
+ * Sorted longest first so the most specific root wins. That matters when the
+ * archive is nested inside the matters root: the archive must be matched
+ * before the matters root, or its own directory name is read as a matter.
+ */
 function matterRoots() {
-  const raw = process.env.CLAUDE_MATTER_ROOTS || '';
-  return raw
-    .split(';')
+  const configured = (process.env.CLAUDE_MATTER_ROOTS || '').split(';');
+  return [...configured, RECORD_ROOT]
     .map((s) => canonical(s))
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((a, b) => b.length - a.length);
 }
 
 /**

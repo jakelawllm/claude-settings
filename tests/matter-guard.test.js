@@ -11,8 +11,9 @@
  *
  * Regressions for bugs this harness found: case 2, the same matter reached by
  * a second alias was denied; case 11, a path leaving the bound matter via ".."
- * was allowed; case 17, the archive wrote to the identity token instead of a
- * real directory.
+ * was allowed; case 17, the archive wrote to the identity token rather than a
+ * real directory; case 20, the central archive sat outside the boundary so any
+ * session could read every matter's records.
  */
 const { spawnSync } = require('child_process');
 const path = require('path');
@@ -179,6 +180,46 @@ check('11 traversal out of bound matter', decision(pre('s1', 'Read', SMITH + '\\
   const centralOk = fs.existsSync(path.join(central, 'smith'))
     && fs.readdirSync(path.join(central, 'smith')).length > 0;
   check('18 transcript filed to central archive', centralOk ? 'filed' : 'missing', 'filed');
+}
+
+// The central archive holds every matter's records in one place, so it must
+// be inside the boundary too, not treated as ordinary non-client storage.
+{
+  const ARCHIVE = '\\\\nas.example.invalid\\ai-records';
+  const a = { ...env, CLAUDE_RECORD_ROOT: ARCHIVE };
+  const callA = (ev) => {
+    const r = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify(ev), encoding: 'utf8', env: a,
+    });
+    try { return JSON.parse(r.stdout); } catch { return {}; }
+  };
+  const bind = { hook_event_name: 'PreToolUse', session_id: 'arch1', tool_name: 'Read',
+                 tool_input: { file_path: SMITH + '\\a.docx' }, cwd: SMITH };
+  callA(bind);
+  check('19 own matter archive readable',
+    decision(callA({ ...bind, tool_input: { file_path: ARCHIVE + '\\Smith\\s.jsonl' } })), 'allow');
+  check('20 other matter archive blocked',
+    decision(callA({ ...bind, tool_input: { file_path: ARCHIVE + '\\Jones\\s.jsonl' } })), 'deny');
+}
+
+// Archive nested inside the matters root: the longer root must win, or the
+// archive's own folder name is mistaken for a matter.
+{
+  const NESTED = ROOT + '\\_ai-records';
+  const n = { ...env, CLAUDE_RECORD_ROOT: NESTED };
+  const callN = (ev) => {
+    const r = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify(ev), encoding: 'utf8', env: n,
+    });
+    try { return JSON.parse(r.stdout); } catch { return {}; }
+  };
+  const bind = { hook_event_name: 'PreToolUse', session_id: 'arch2', tool_name: 'Read',
+                 tool_input: { file_path: SMITH + '\\a.docx' }, cwd: SMITH };
+  callN(bind);
+  check('21 nested archive, own matter',
+    decision(callN({ ...bind, tool_input: { file_path: NESTED + '\\Smith\\s.jsonl' } })), 'allow');
+  check('22 nested archive, other matter',
+    decision(callN({ ...bind, tool_input: { file_path: NESTED + '\\Jones\\s.jsonl' } })), 'deny');
 }
 
 console.log('\nbinding state:');
