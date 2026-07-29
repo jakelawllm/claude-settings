@@ -88,6 +88,17 @@ File-based and MDM delivery work on any plan, because they are enforced on the d
 
 The user file goes to `~/.claude/settings.json`, or `%USERPROFILE%\.claude\settings.json` on Windows.
 
+The skill and the hook go into the same system directory as the organisation file, which is what makes them organisation policy rather than a preference a user can change:
+
+```
+<system directory>/skills/ai-policy-compliance/SKILL.md
+<system directory>/hooks/matter-guard.js
+```
+
+A skill in that directory is the enterprise level, and it overrides a personal or project skill of the same name, so a practitioner cannot shadow it with a laxer copy. The `hooks` block in `managed-settings.json` points at the path above; change it there if you deploy the script elsewhere. The hook needs Node on the machine.
+
+Two settings decide how firmly this holds. `allowManagedHooksOnly` is already set, so only managed hooks load and a user cannot disable the guard by editing their own settings. `strictPluginOnlyCustomization` is not set here: it blocks skills, agents, hooks and MCP servers from user and project sources so they can come only from plugins or managed settings, and it accepts an array such as `["skills", "hooks"]` to lock named surfaces rather than all four. Consider it if a practitioner adding their own skills is a concern; leave it off if it is not, because it also stops legitimate local tooling.
+
 ## Change these seven things first
 
 `claudeMd` opens with `REPLACE-WITH-YOUR-FIRM-NAME`. Substitute the practice's own name, and read the policy text through before you deploy it. It is one firm's position on scope, evidence, verification and records, and it is enforced as a standing instruction in every session, so it should say what your practice has actually decided rather than what this file happens to say.
