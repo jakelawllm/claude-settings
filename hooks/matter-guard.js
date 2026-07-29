@@ -195,11 +195,16 @@ function resolveRoots() {
       return false;
     }
   });
-  const usable = (present.length ? present : []).map(canonical).filter(Boolean);
+  // Resolved to real paths, not canonicalised lexically. Targets are resolved
+  // (a symlink out of a matter must be caught), so a root that is not would
+  // never match one: on macOS /var is a symlink to /private/var, and a matters
+  // root under it compared unequal to every path inside it. Nothing looked
+  // like client material and the guard permitted everything.
+  const usable = present.map(realCanonical).filter(Boolean);
   if (usable.length === 0) {
     return { roots: [], error: 'no configured matters root is reachable from this machine' };
   }
-  if (RECORD_ROOT) usable.push(canonical(RECORD_ROOT));
+  if (RECORD_ROOT) usable.push(realCanonical(RECORD_ROOT));
 
   // Longest first: an archive nested inside the matters root must match as the
   // archive, not be read as a matter named after its own folder.

@@ -173,6 +173,7 @@ check(
 
 freshState();
 pre('s7', 'Read', path.join(SMITH, 'a.txt'), SMITH);
+fs.mkdirSync(STATE, { recursive: true }); // the binding write may not have run
 fs.writeFileSync(path.join(STATE, 's7.json'), '{ this is not json');
 check('19 corrupt state refuses (C-01)', decision(pre('s7', 'Read', path.join(SMITH, 'a.txt'), SMITH)), 'deny');
 

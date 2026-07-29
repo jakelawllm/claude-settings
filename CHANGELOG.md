@@ -18,6 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loos
 - The sandbox is enabled in managed settings with `failIfUnavailable` and `allowUnsandboxedCommands: false`. Native Windows has no sandbox, so Claude Code will refuse to start there rather than run without the boundary.
 - `allowedMcpServers` ships empty. A `serverName` entry matches a display name, which does not identify a server.
 - `requiredMinimumVersion` raised to `2.1.219`.
+- Matters roots are resolved to their real paths. They were canonicalised lexically while targets were resolved, so on macOS, where `/var` is a symlink to `/private/var`, a root under it matched nothing: no path looked like client material and every cross-matter access was permitted. Found by cross-platform CI on its first run.
 - All GitHub Actions are pinned to full commit SHAs.
 
 ### Added
