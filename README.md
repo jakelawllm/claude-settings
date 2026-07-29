@@ -14,15 +14,19 @@ It is offered for comparison and adaptation. It is a configuration baseline, not
 
 `managed-settings.json` is the organisation-level policy. It is enforced above user and project settings and cannot be overridden by staff, which is what makes it useful for supervision under rule 37 of the Legal Profession Uniform Law Australian Solicitors' Conduct Rules 2015.
 
-`settings.json` is the user-level equivalent, for a sole practitioner or a small practice with no managed deployment. It is a subset of the organisation file limited to keys that work in user scope.
+`settings.json` is the user-level equivalent, for a sole practitioner or a small practice with no managed deployment. It is a subset of the organisation file limited to keys that work in user scope. Read the note on clause 6.5(b) below before treating it as an equivalent of the managed deployment, because on a consumer plan it is not one.
 
 `matter-settings.json` is an optional per-matter file, placed at `.claude/settings.json` inside a matter folder, which denies the web tools for work where nothing should be reaching outward.
+
+`ai-policy-legal-practice-template.docx` is the policy these files exist to enforce, as a template for an Australian practice. `ai-policy-legal-practice-template.md` is a rendering of it produced by `scripts/docx-to-md.py`, so that it can be read and diffed here. The `.docx` is the authoritative document. The policy governs: where it and the configuration differ, the configuration is wrong.
 
 ## Before you deploy anything
 
 Two things sit outside these files and matter more than anything in them.
 
-Turn off the model training setting at `claude.ai/settings/data-privacy-controls`. On a consumer plan this is what moves you from five-year retention with training to thirty-day retention without it. No configuration key substitutes for it. On Team, Enterprise or API access under commercial terms, training is off by default and the position is set by contract rather than by a toggle any user can change.
+Turn off the model training setting at `claude.ai/settings/data-privacy-controls`. On a consumer plan this is what moves you from five-year retention with training to thirty-day retention without it. No configuration key substitutes for it.
+
+Do not mistake that toggle for compliance. Clause 6.5(b) requires that the supplier not use inputs or outputs to train its models, "and that this is a term of the contract rather than a setting a user can alter". A toggle is a setting a user can alter. A consumer plan therefore cannot be entered in the Approved Tools Register at Schedule 1 whatever its configuration, and on such a plan `settings.json` is harm reduction for a tool the policy does not permit on client work, not an equivalent of the managed deployment. On Team, Enterprise or API access under commercial terms the position is set by contract and clause 6.5(b) is satisfied.
 
 Exclude the `.claude` directory from OneDrive, Dropbox, iCloud Drive, roaming profiles and any consumer backup agent, and keep whole-disk encryption on. Session transcripts are written there in plaintext. They are the firm's own records on the firm's own machine, so they are not a disclosure to anyone, but a sync client that replicates the home directory turns them into one by a route nobody assessed.
 
@@ -42,13 +46,15 @@ File-based and MDM delivery work on any plan, because they are enforced on the d
 
 The user file goes to `~/.claude/settings.json`, or `%USERPROFILE%\.claude\settings.json` on Windows.
 
-## Change these four things first
+## Change these five things first
 
 `claudeMd` opens with `REPLACE-WITH-YOUR-FIRM-NAME`. Substitute the practice's own name, and read the policy text through before you deploy it. It is one firm's position on scope, evidence, verification and records, and it is enforced as a standing instruction in every session, so it should say what your practice has actually decided rather than what this file happens to say.
 
-`OTEL_EXPORTER_OTLP_ENDPOINT` carries a placeholder. Either point the five OpenTelemetry keys at your collector or delete all five. They matter more than they would on an Enterprise plan, because Claude audit logs record access metadata and not conversation content, so your own collector is the only record of what was sent, to which endpoint, on what date. That record is what you would rely on if a claim of privilege or compliance with the Harman undertaking is contested.
+`forceLoginOrgUUID` is not in the file and must be added, with the practice's real Anthropic organisation UUID. Clause 6.8 prohibits the use of a personal account for any work of the practice, even where the underlying product is the same as an approved tool, because the account determines the contractual terms, the retention period and whether inputs are used for training. `forceLoginMethod` does not reach that: it restricts the sign-in method, not the account, so a personal Claude.ai subscription satisfies it. `forceLoginOrgUUID` is the key that enforces clause 6.8. It is omitted here rather than shipped with a placeholder because an invalid value blocks every login, so add it once with the real value.
 
-`allowedMcpServers` is an allowlist operating together with `allowManagedMcpServersOnly`. Anything not named is blocked. Replace the example entry with the servers you actually sanction.
+`OTEL_EXPORTER_OTLP_ENDPOINT` carries a placeholder. Point the five OpenTelemetry keys at your collector. Claude audit logs record access metadata and not conversation content, so your own collector is the only record of what was sent, to which endpoint, on what date, and that record is what you would rely on if a claim of privilege or compliance with the Harman undertaking is contested. Clause 6.5(h) requires that what logging is available to the practice be established before a tool is approved, and clause 16.5 requires that a tool which cannot produce a record of what was sent to it have that limitation recorded in Schedule 1. The five keys are what stop that limitation applying. Deleting them is a choice to record it.
+
+`allowedMcpServers` is an allowlist operating together with `allowManagedMcpServersOnly`. Anything not named is blocked. Replace the example entry with the servers you actually sanction. An MCP server is itself a tool for the purposes of clause 6, so each one named here needs an assessment under clause 6.5 and an entry in Schedule 1 before it is added, not after.
 
 `requiredMinimumVersion` blocks startup below the stated version. Confirm the fleet is at or above it before pushing, or drop to `minimumVersion`, which governs updates without blocking a session.
 
@@ -91,11 +97,9 @@ Managed settings parse tolerantly, so one bad entry is stripped rather than void
 
 `availableModels` with `enforceAvailableModels` restricts model selection. It is omitted here because an invalid value leaves only the default model available.
 
-`forceLoginOrgUUID` requires login to belong to a nominated Anthropic organisation. It is omitted because an invalid value blocks all logins, so it should be added once with the real UUID rather than shipped with a placeholder.
-
 ## Regulatory basis
 
-The `claudeMd` policy string is drawn from the following, and the wording tracks them deliberately.
+The `claudeMd` policy string states clauses 7.1, 8.2, 8.3 and 9 of the policy in the compressed form a standing instruction requires. The policy is the authority: if the two ever differ, the string is to be corrected, not the policy. Both are drawn from the following, and the wording tracks them deliberately.
 
 Practice Note SC Gen 23, Supreme Court of New South Wales, issued 28 January 2025 and commenced 3 February 2025, adopted in the District Court, Local Court and Land and Environment Court. Paragraph 9A prohibits entering material subject to a suppression or non-publication order, the implied Harman undertaking, material produced on subpoena, or material subject to a statutory prohibition on publication into any generative artificial intelligence program unless the practitioner is satisfied the information remains within the controlled environment of the platform, that the supplier is bound by confidentiality restrictions so the data is neither made publicly available nor used to train any large language model, that it is used only in connection with that proceeding, and that it is not used to train the program or any model. Paragraphs 10 to 18 carry the evidence and verification obligations.
 
@@ -108,6 +112,20 @@ Rule 9, Legal Profession Uniform Law Australian Solicitors' Conduct Rules 2015. 
 Australian Privacy Principle 8 and section 16C of the Privacy Act 1988 (Cth), which make a disclosing entity accountable for an overseas recipient's handling of personal information, subject to exceptions.
 
 A Solicitor's Guide to Responsible Use of Artificial Intelligence, Law Society of New South Wales, January 2026, and the joint statement of the Law Society of NSW, the Victorian Legal Services Board and Commissioner and the Legal Practice Board of Western Australia of 6 December 2024.
+
+## What the configuration reaches, and what it does not
+
+These files are an enforcement layer for parts of four clauses of the policy, and no part of the rest.
+
+They reach clause 6, by confining sign-in and the servers a session can call; clause 7, by stating the prohibited uses as a standing instruction; clause 8, by stating the restricted categories and the four satisfactions required before any of them is used; and clause 15, through retention, local storage and access.
+
+They do not reach clause 9, verification; clause 10, disclosure to courts and tribunals; clause 11, experts and counsel; clause 12, clients, their own terms and their consent; clause 14, costs; clause 16, the record of what was done; clause 17, training; clause 19, incidents; or clause 20, compliance. Those clauses are discharged by people, and a configuration cannot be written that discharges them.
+
+Two gaps are worth naming precisely, because they look like configuration problems and are not.
+
+Clause 2.2 applies to personal devices. A managed settings file binds only the devices it has been deployed to. `forceRemoteSettingsRefresh` closes the gap for a machine that never received the file, but only where settings are served at sign-in, which requires Team or Enterprise. On any other plan, a practitioner who installs the CLI on a personal laptop is outside these files entirely, and clause 2.2 is enforced by supervision or not at all.
+
+Clause 12.2 requires the client's own terms to be checked, and some clients prohibit the use of AI outright. There is no setting for that, and `matter-settings.json` is not one: denying the web tools narrows a session, it does not prohibit one. A matter in which the client has prohibited AI is a matter in which the tool is not opened.
 
 ## Known limitations
 
