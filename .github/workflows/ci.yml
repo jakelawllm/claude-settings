@@ -61,8 +61,10 @@ jobs:
       # say.
       - name: Policy Markdown is in step with the DOCX
         run: |
-          python scripts/docx-to-md.py ai-policy-legal-practice-template.docx /tmp/regen.md
-          diff -u ai-policy-legal-practice-template.md /tmp/regen.md
+          for d in ai-policy-legal-practice-template ai-protocol-barristers-chambers; do
+            python scripts/docx-to-md.py "$d.docx" "/tmp/$d.regen.md"
+            diff -u "$d.md" "/tmp/$d.regen.md"
+          done
 
       # Clause references are load-bearing: the settings, the skill and the
       # README all cite them, and a renumbered policy silently invalidates them.

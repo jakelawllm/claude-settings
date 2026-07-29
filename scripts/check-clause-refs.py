@@ -20,6 +20,9 @@ SOURCES = [
     ROOT / "README.md",
     ROOT / "skills" / "ai-policy-compliance" / "SKILL.md",
 ]
+# The barristers protocol numbers its clauses independently of the practice
+# policy, so its own cross-references are checked against itself.
+SELF_CONTAINED = [ROOT / "ai-protocol-barristers-chambers.md"]
 
 CLAUSE = re.compile(r"clause\s+(\d+(?:\.\d+)?)", re.I)
 SCHEDULE = re.compile(r"Schedule\s+(\d+)")
@@ -43,6 +46,21 @@ def main() -> int:
         for ref in sorted(set(SCHEDULE.findall(text))):
             if ref not in schedules:
                 failures.append(f"{rel}: Schedule {ref} does not exist in the policy")
+
+    for doc in SELF_CONTAINED:
+        if not doc.exists():
+            continue
+        text = doc.read_text(encoding="utf8")
+        rel = doc.relative_to(ROOT).as_posix()
+        own = set(re.findall(r"^\*\*(\d+\.\d+)\*\*", text, re.M))
+        own |= set(re.findall(r"^## (\d+)\s\s", text, re.M))
+        own_sched = set(re.findall(r"^## Schedule (\d+)\s", text, re.M))
+        for ref in sorted(set(CLAUSE.findall(text))):
+            if ref not in own:
+                failures.append(f"{rel}: clause {ref} does not exist in that document")
+        for ref in sorted(set(SCHEDULE.findall(text))):
+            if ref not in own_sched:
+                failures.append(f"{rel}: Schedule {ref} does not exist in that document")
 
     if failures:
         print("Unresolved references:")

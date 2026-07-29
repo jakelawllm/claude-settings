@@ -21,6 +21,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loos
 - Matters roots are resolved to their real paths. They were canonicalised lexically while targets were resolved, so on macOS, where `/var` is a symlink to `/private/var`, a root under it matched nothing: no path looked like client material and every cross-matter access was permitted. Found by cross-platform CI on its first run.
 - All GitHub Actions are pinned to full commit SHAs.
 
+### Policy documents
+
+- Added `ai-protocol-barristers-chambers.docx` and its Markdown rendering: the equivalent instrument for a barrister and for chambers, covering releasing work under your own name, readers and devils, chambers arrangements, fees and copyright. Its clause numbering is its own and nothing in this repository is wired to it.
+- The practice policy is replaced with a revision that restores the template placeholders, states clause 8.3 as three matters rather than four, quotes rule 9.1 of the conduct rules more precisely, and genericises Schedule 8 Part E so a practice on another tier or provider does not inherit conclusions that are wrong for it.
+- Clause 8.8 now records that the construction it rests on "follows from the text of the instrument but has not been the subject of decision". That is the release review's H-05 finding, and the wording in the incoming revision is better than the one previously applied here, so the earlier version was dropped rather than duplicated.
+- References to "the four satisfactions" in the README and the skill are corrected: clause 8.3 now states three.
+
 ### Policy template
 
 - Clause 8.8 now states that "a retention period is neither publication nor training" is a conclusion the practice has reached on the wording of the instruments, not a supplier fact, and requires approval by the principal with a date. It is the reasoning that permits restricted information on a tier without zero data retention, so an adopting practice must reach its own view rather than inherit this one.

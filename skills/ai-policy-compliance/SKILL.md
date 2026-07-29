@@ -5,7 +5,7 @@ description: Use when drafting, settling, reviewing or editing anything that wil
 
 # AI policy compliance
 
-Operate this skill in every task touching legal work product or client material. It makes the firm's Policy on the Use of Artificial Intelligence in Legal Practice operative in the session. It is not a technical control: the managed settings file governs what tools may do, and this skill governs what is produced and what is said about it. Clause references are to the policy.
+Operate this skill in every task touching legal work product or client material. It makes the firm's Policy on the Use of Artificial Intelligence in Legal Practice operative in the session. It is not a technical control: the managed settings file governs what tools may do, and this skill governs what is produced and what is said about it. Clause references are to the practice's Policy on the Use of Artificial Intelligence in Legal Practice. They do not track the separate protocol for barristers and chambers, which numbers its clauses differently; a chambers using this skill must remap them first.
 
 This skill supersedes `gen-ai-compliance`, which covered one instrument only. Retire that skill when this one is deployed.
 

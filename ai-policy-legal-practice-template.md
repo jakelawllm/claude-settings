@@ -7,13 +7,13 @@ A template for Australian legal practices
 
 | Field | Detail | Version | History |
 |---|---|---|---|
-| Policy owner | Principal | 3.0 | [Date] Adopted |
-| Approved by | Principal |  |  |
+| Policy owner | [Name or position] | 1.0 | [Date] Adopted |
+| Approved by | [Principals or board] |  |  |
 | Effective from | [Date] |  |  |
 | Next review | [Date, not later than 12 months] |  |  |
 | Applies to | All personnel and contractors |  |  |
 
-This is a template. Text in square brackets must be completed, and every clause should be reviewed against the practice's own structure, practice areas, jurisdictions and insurance arrangements before adoption. Clause 6 and Schedule 1 do not operate until the practice has decided which tools it approves. Schedule 5 must be completed with the instruments in force in each jurisdiction in which the practice appears. Clause 9 states the verification standard and is the clause most often departed from in practice.
+This is a template. Fields in square brackets must be completed, and every clause should be reviewed against the practice's own structure, practice areas, jurisdictions and insurance arrangements before adoption. Clause 6 and Schedule 1 do not operate until the practice has decided which tools it approves. Schedule 5 must be completed with the instruments in force in each jurisdiction in which the practice appears. Clause 9 states the verification standard and is the clause most often departed from in practice.
 
 Contents
 
@@ -83,7 +83,7 @@ Schedule 10  Acknowledgment
 
 ## 1  Purpose
 
-**1.1**  This policy governs the use of artificial intelligence by [Firm] and states what is permitted, what is prohibited, and what must be recorded. It is directed at four risks: the disclosure of client information to a third party without authority, the presentation of inaccurate material to a court or a client, charging a client for work that was not done, and the loss of the practice's ability to demonstrate what was done and why.
+**1.1**  This policy governs the use of artificial intelligence by [Firm] and states what is permitted, what is prohibited, and what must be recorded. It is directed at four risks: the disclosure of client information to a third party without authority, the presentation of inaccurate material to a court or a client, charging a client for work that was not done, and the loss of the practice's ability to show what was done and why.
 
 **1.2**  Artificial intelligence is a tool. Its use does not alter, qualify or reduce any duty owed to a client, to a court or to the practice. Every obligation that applies to work produced by hand applies to work produced with assistance.
 
@@ -137,7 +137,7 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 
 ## 4  The obligations this policy serves
 
-**4.1**  Confidentiality, under rule 9.1 of the Australian Solicitors' Conduct Rules. A solicitor must not disclose information confidential to a client and acquired during the engagement, except to a person within the practice or a person engaged by the practice for the purposes of delivering or administering legal services to that client, or as otherwise permitted. The engagement of a supplier for the purposes of the matter is not of itself a breach. Whether a particular tool falls within that description depends on its terms and configuration, which is why clause 6 restricts use to approved tools. The regulators treat the entry of client information into a public tool as akin to placing it in the public domain, likely to breach rule 9.1 and to put privilege at risk.
+**4.1**  Confidentiality, under rule 9.1 of the Australian Solicitors' Conduct Rules. A solicitor must not disclose information confidential to a client and acquired during the engagement, except to a solicitor who is a partner, principal, director or employee of the practice, or to a barrister or an employee of, or person otherwise engaged by, the practice or an associated entity for the purposes of delivering or administering legal services in relation to that client, or as otherwise permitted. The engagement of a supplier for the purposes of the matter is not of itself a breach. Whether a particular tool falls within that description depends on its terms and configuration, which is why clause 6 restricts use to approved tools. The regulators treat the entry of client information into a public tool as akin to placing it in the public domain, likely to breach rule 9.1 and to put privilege at risk.
 
 **4.2**  Competence and diligence, under rules 4.1.2 and 4.1.3. A solicitor using a tool to prepare a document must be able and qualified to verify personally the information the document contains, and must ensure that its contents are accurate and not likely to mislead the client, the court or another party.
 
@@ -239,12 +239,11 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 
 **8.3**  Restricted information must not be entered into any tool, including an approved tool, unless the responsible practitioner has first been satisfied of each of the following and has recorded that satisfaction on the matter file:
 
-- **(a)** that the information will remain within the controlled environment of the platform being used;
-- **(b)** that the platform is the subject of confidentiality restrictions on the supplier ensuring that the data is not made publicly available and is not used to train any large language model;
-- **(c)** that the information is to be used only in connection with the proceeding in which it was obtained, unless otherwise required or permitted by law to be disclosed; and
-- **(d)** that the information is not used to train the tool or any model.
+- **(a)** that the information will remain within the controlled environment of the platform being used, and that the platform is the subject of confidentiality restrictions on the supplier ensuring that the data is not made publicly available and is not used to train any large language model;
+- **(b)** that the information is to be used only in connection with the proceeding in which it was obtained, unless otherwise required or permitted by law to be disclosed or required to be reviewed by a law enforcement agency; and
+- **(c)** that the information is not used to train the tool or any model.
 
-**8.4**  Satisfaction under clause 8.3 is reached by reviewing the contractual terms and the privacy and confidentiality settings actually in force, not by accepting the supplier's description of its product. The practitioner must be able to say what establishes each of the four matters.
+**8.4**  The matters in clause 8.3 reproduce the conditions imposed by the instrument at Schedule 5 and are to be read with it rather than as a separate standard. Satisfaction is reached by reviewing the contractual terms and the privacy and confidentiality settings actually in force, not by accepting the supplier's description of its product, and the practitioner must be able to say what establishes each of those matters.
 
 **8.5**  The undertaking can still be breached where the material stays within the tool but an output derived from it is later used in a different matter or for a different purpose. An approval under this clause is confined to the proceeding for which it is given and to the purpose recorded.
 
@@ -252,7 +251,7 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 
 **8.7**  Where the practitioner cannot be satisfied of each matter in clause 8.3, the material is not to be used with any tool. Difficulty or inconvenience in establishing those matters is a reason not to use the tool, not a reason to proceed.
 
-**8.8**  A supplier retention period is not of itself publication, and it is not training. The absence of a zero retention arrangement therefore does not prevent satisfaction under clause 8.3, and on some subscription tiers such an arrangement is not offered at all. Where it is unavailable, satisfaction rests on three things instead: the contractual term that inputs and outputs are not used to train any model and are not made publicly available, the closure of every channel that retains material for longer than the ordinary session, and the practice being able to show from its own records that material was sent, when, by whom and to which endpoint. Where the content itself must be recoverable, that record is made under clause 17 on the matter file, or by configuring the practice's telemetry to retain content, and Schedule 8 records which applies to each application. Part E of that schedule records the consequences of the tier the practice holds. The proposition in this clause that a retention period is neither publication nor training is a conclusion this practice has reached on the wording of the instruments at Schedule 5, and not a statement of fact by any supplier. It is to be approved by the principal, recorded with the date of approval, and reconsidered whenever those instruments are amended or the supplier's terms change. A practice adopting this template must reach its own view rather than inherit this one.
+**8.8**  A supplier retention period is not of itself publication, and it is not training. On that construction, which follows from the text of the instrument but has not been the subject of decision, the absence of a zero retention arrangement does not prevent satisfaction under clause 8.3, and on some subscription tiers such an arrangement is not offered at all. Where it is unavailable, satisfaction rests on three things instead: the contractual term that inputs and outputs are not used to train any model and are not made publicly available, the closure of every channel that retains material for longer than the ordinary session, and the practice being able to show from its own records that material was sent, when, by whom and to which endpoint. Where the content itself must be recoverable, that record is made under clause 17 on the matter file, or by configuring the practice's telemetry to retain content, and Schedule 8 records which applies to each application. Part E of that schedule records the consequences of the tier the practice holds.
 
 ## 9  Verification
 
@@ -408,7 +407,7 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 
 ## 19  Responsibility
 
-**19.1**  The practice appoints the Principal as AI Officer. The Principal may delegate the role in writing, and any delegation is recorded in the document control table at the front of this policy. The AI Officer maintains Schedules 1, 5 and 8 and the evidence files kept under clause 6.11, decides requests under clause 6.9, receives reports under clause 20, conducts the reviews under clause 21, and reports to the principals at least annually on the use of AI in the practice.
+**19.1**  The practice appoints [name or position] as AI Officer. The appointment may be delegated in writing, and any delegation is recorded in the document control table at the front of this policy. The AI Officer maintains Schedules 1, 5 and 8 and the evidence files kept under clause 6.11, decides requests under clause 6.9, receives reports under clause 20, conducts the reviews under clause 21, and reports to the principals at least annually on the use of AI in the practice.
 
 **19.2**  The principals are responsible for the operation of this policy, for providing the resources it requires, and for ensuring that supervision arrangements account for AI-assisted work.
 
@@ -531,10 +530,9 @@ To be completed by the responsible practitioner before restricted information is
 | Description of the material |  |
 | Tool and version proposed |  |
 | Purpose, confined to this proceeding |  |
-| Basis for satisfaction: information remains in the controlled environment |  |
-| Basis for satisfaction: supplier bound by confidentiality, no public availability, no training |  |
+| Basis for satisfaction: information remains in the controlled<br>environment, and the supplier is bound by confidentiality restrictions<br>so the data is neither made public nor used to train any model |  |
 | Basis for satisfaction: use confined to this proceeding |  |
-| Basis for satisfaction: no use for training |  |
+| Basis for satisfaction: not used to train the tool or any model |  |
 | Client informed and consent recorded (clause 12.3) |  |
 | Responsible practitioner and date |  |
 
@@ -542,7 +540,7 @@ To be completed by the responsible practitioner before restricted information is
 
 To be completed with the instruments in force in each jurisdiction in which the practice appears, and checked at each review. The entries below were current when this template was prepared and must be verified before the policy is adopted.
 
-An instrument is only as current as the date it was last checked. Each row carries that date and the person who checked it, and a row without one is to be treated as unverified. These instruments are amended, and several already have been, so a paragraph number relied on elsewhere in this policy may move.
+An instrument is only as current as the date it was last checked. Each row carries that date and the person who checked it, and a row without one is to be treated as unverified. These instruments are amended, and several already have been, so a paragraph number relied on elsewhere may move.
 
 | Court | Instrument | Date | Source, and date last checked |
 |---|---|---|---|
@@ -603,18 +601,18 @@ A quotation that is fluent and apt but cannot be located in the source given for
 
 Maintained by the AI Officer and reviewed quarterly. An application not listed here is not approved. Entries record the position established at the date of the last review; every claim about training, retention and data location must be traceable to the evidence file kept under clause 6.11, and not to a supplier's marketing material. Settings named below were verified against supplier documentation at the date of review and are renamed by suppliers more often than this policy is amended.
 
-Three kinds of statement appear in this schedule and must not be read alike. A supplier fact is something the supplier states and the evidence file records, such as a retention period or a processing location; it is verified against the executed agreement, not against marketing material, and it changes when the contract changes. A deployment fact is something true of this practice's own arrangements, such as the tier held or the region configured; a practice adopting this template must replace every one of them. A conclusion is the practice's own view of what the instruments require, and carries the date it was approved and by whom. Where an entry below mixes them, the supplier fact is the part that must be traceable to the evidence file under clause 6.11.
+Three kinds of statement appear here and must not be read alike. A supplier fact is something the supplier states and the assessment records, such as a retention period or a processing location; it is verified against the executed agreement rather than marketing material, and it changes when the contract changes. A deployment fact is something true of these particular arrangements, such as the tier held or the region configured, and every one of them must be replaced on adoption. A conclusion is a view taken of what the instruments require, and carries the date it was approved and by whom. Where an entry mixes them, the supplier fact is the part that must be traceable to the evidence held for the tool.
 
 ### Part A  Approved for client information
 
-These applications may be used with client information subject to the settings recorded. Approval for restricted information under clause 8 is stated separately, because it requires the four matters in clause 8.3 to be established.
+These applications may be used with client information subject to the settings recorded. Approval for restricted information under clause 8 is stated separately, because it requires the matters in clause 8.3 to be established.
 
 | Application | Tier required | Settings that must be in force | Restricted information |
 |---|---|---|---|
 | Practice management AI<br>assistant | Included in the practice<br>subscription; admin<br>consent step completed | Supplier confirms in writing that answers are not used to train any model and that data is hosted in Australia. No client-identifying material in free-text queries beyond what the matter requires. | Permitted once the clause 8.3 matters are recorded. Verification under clause 9 applies in full: a legal-sector tool with a sound data posture still fabricates authority. |
-| Legal research platform<br>with AI answers | Firm licence with the<br>Australian hosting term | Written confirmation of Australian hosting and processing, that customer prompts and output are not used for training, and that model calls use zero-retention interfaces. Organisation retention schedule set to the shortest available. | Permitted where the four matters in clause 8.3 are established by the contract. |
+| Legal research platform<br>with AI answers | Firm licence with the<br>Australian hosting term | Written confirmation of Australian hosting and processing, that customer prompts and output are not used for training, and that model calls use zero-retention interfaces. Organisation retention schedule set to the shortest available. | Permitted where the matters in clause 8.3 are established by the contract. |
 | Microsoft 365 Copilot | Included tenant licence;<br>not enabled by default | Not enabled on client matters until SharePoint and OneDrive permissions have been audited and broad grants removed, restricted search is deployed, sensitivity labels and retention are applied, and Copilot interactions are captured for discovery. Web grounding off for sensitive queries. Confirm tenant data location. | Permitted within the tenant once the permission remediation is complete and recorded. The risk is oversharing rather than training. |
-| General assistant,<br>firm workspace | Team; personal<br>accounts prohibited.<br>See Part E | Training off under the commercial terms and established by the contract, not by a user setting. Retention is thirty days and cannot be shortened on this tier. The feedback, bug and share commands and the session transcript prompt disabled by managed policy, because those channels retain for five years and six months. Single sign-on enforced. Connectors and assistants restricted to those approved. Transmission logging to the practice collector configured. | Permitted where the contractual matters in clause 8.3 are recorded on the file. Clause 8.3 does not require zero retention, and thirty-day retention is neither publication nor training: see clause 8.8. Because zero retention is not available on this tier, the contractual term and the practice transmission record carry the weight, and both must be in place first. Where the client requires that nothing be retained, use the tenancy route below. |
+| General assistant,<br>firm workspace | Business or team tier;<br>personal and free<br>accounts prohibited.<br>See Part E | Training off under the commercial terms and established by the contract, not by a user setting. Retention set to the shortest period the tier allows, and recorded. The feedback, bug and share commands and the session transcript prompt disabled by managed policy, because those channels retain for five years and six months. Single sign-on enforced. Connectors and assistants restricted to those approved. Transmission logging to the practice collector configured. | Permitted where the contractual matters in clause 8.3 are recorded on the file. Clause 8.3 does not require zero retention, and a fixed retention period is neither publication nor training: see clause 8.8. Where no zero retention arrangement is available on the tier held, the contractual term and the practice transmission record carry the weight, and both must be in place first. Where the client requires that nothing be retained, use the tenancy route below. |
 | Assistant through the<br>firm cloud tenancy | Tenancy in an Australian<br>region | Region pinned to Australia. Prompts and completions remain within the tenancy. Non-essential traffic to the model supplier disabled. Tenancy logging enabled. | Permitted, and the route to use where a client term or the sensitivity of the material requires that the supplier retain nothing. The configuration most readily evidenced under clause 8.3. |
 
 ### Part B  Approved for general use only
@@ -653,7 +651,7 @@ These must not be used for any work of the practice. See clause 7.4.
 
 ### Part E  Subscription tier and its consequences
 
-This Part is a worked example of one practice's arrangements, not a statement of the template's position, and every fact in it must be replaced on adoption. A practice on a different tier, or using Amazon Bedrock, Google Cloud, Microsoft-hosted models or its own cloud tenancy, will inherit conclusions that are wrong for it if this Part is left as written. The worked example follows. The practice holds a Team subscription for its general assistant. A zero retention arrangement is not offered on that tier, so retention by the supplier is thirty days and cannot be shortened by configuration. That is the fixed premise for the rest of this schedule, and it is recorded here rather than in the body of the policy because it will change if the practice changes tier.
+The practice records here the subscription tier it holds for each application in Part A, because the tier governs what is available and what is not. The common case, and the premise on which the rest of this Part is written, is a business or team subscription on which a zero retention arrangement is not offered. On such a tier retention by the supplier is a fixed period, commonly thirty days, and cannot be shortened by configuration. This is recorded here rather than in the body of the policy because it changes if the practice changes tier.
 
 What the tier does provide is the commercial terms, under which inputs and outputs are not used to train any model; organisation-level policy control, including the ability to prevent a user enabling the mode that removes permission prompts; and a managed settings file enforced on the device that a user cannot override. That file is delivered by deployment or by device management rather than by the subscription, so the hardening in Part F does not depend on the tier at all.
 
@@ -661,7 +659,7 @@ What the tier does not provide is a zero retention arrangement, and the depth of
 
 Two consequences follow, and they are the practical difference between this tier and one with a zero retention arrangement. First, the prompts that offer to send a session transcript to the supplier are suppressed for an organisation holding such an arrangement and are not suppressed here, so the settings that disable the feedback, bug and share commands and the session survey are mandatory rather than prudent. Those channels retain material for five years and six months respectively, well beyond the thirty days that governs the session itself, and they are the only paths by which client material leaves for a materially longer period. Second, where a matter requires that a supplier retain nothing at all, whether because of a term imposed by the client or the sensitivity of the material, the answer is not a setting. It is a different route: a deployment within the practice's own cloud tenancy in an Australian region, redaction before the material is sent, or not using the tool for that matter.
 
-Two surfaces are absent on this tier, which narrows the exposure rather than widening it. Screen control, by which the tool operates the applications on a workstation directly, and the facility that dispatches work from a telephone to a session running on a desktop, are both unavailable on Team and Enterprise subscriptions, each requiring a Pro or Max subscription instead. That position is stated in the supplier's desktop application documentation and the reference is held in the evidence file.
+Some surfaces are absent on a business or team subscription, which narrows the exposure rather than widening it. In the case of one widely used assistant, screen control, by which the tool operates the applications on a workstation directly, and the facility that dispatches work from a telephone to a session running on a desktop, are both unavailable on its team and enterprise subscriptions and require a personal subscription instead. Where a practice relies on the absence of a feature, the supplier's documentation stating it is held in the evidence file.
 
 ### Part F  Claude Code managed settings
 
@@ -675,7 +673,7 @@ Publishing and relay surfaces are closed through disableArtifact, disableRemoteC
 
 Telemetry to the practice collector is enabled through CLAUDE_CODE_ENABLE_TELEMETRY together with the exporter, endpoint and protocol variables. Content is gated separately and is redacted unless the gate is set: OTEL_LOG_USER_PROMPTS, OTEL_LOG_ASSISTANT_RESPONSES, OTEL_LOG_TOOL_DETAILS and OTEL_LOG_TOOL_CONTENT each govern a category. The practice leaves all four unset, so the collector evidences transmission and not content, and the content record is made under clause 17. Two features of those gates matter. The assistant response gate follows the prompt gate when it is left unset, so enabling prompt content also enables response content unless the response gate is expressly set to zero. And where sign-in is by OAuth the user email appears in telemetry attributes, which the collector's own retention must account for. If content logging is ever enabled, clause 17.4 applies to the collector.
 
-Because a zero retention arrangement is not available on the practice's tier, the settings in this Part are the whole of the control. The variables that disable the feedback, bug and share commands and the session survey must be in force before Claude Code is used on any client matter, and the practice's own OpenTelemetry collector must be configured, because between them they close the long-retention channels and supply the transmission record that nothing else on this tier provides. See Part E.
+Where a zero retention arrangement is not available on the tier the practice holds, the settings in this Part are the whole of the control. The variables that disable the feedback, bug and share commands and the session survey must be in force before Claude Code is used on any client matter, and the practice's own OpenTelemetry collector must be configured, because between them they close the long-retention channels and supply the transmission record that nothing else on this tier provides. See Part E.
 
 ### Part G  Evidence required for each entry in Part A
 
