@@ -84,11 +84,13 @@ File-based and MDM delivery work on any plan, because they are enforced on the d
 
 The user file goes to `~/.claude/settings.json`, or `%USERPROFILE%\.claude\settings.json` on Windows.
 
-## Change these five things first
+## Change these six things first
 
 `claudeMd` opens with `REPLACE-WITH-YOUR-FIRM-NAME`. Substitute the practice's own name, and read the policy text through before you deploy it. It is one firm's position on scope, evidence, verification and records, and it is enforced as a standing instruction in every session, so it should say what your practice has actually decided rather than what this file happens to say.
 
 `forceLoginOrgUUID` is not in the file and must be added, with the practice's real Anthropic organisation UUID. Clause 6.8 prohibits the use of a personal account for any work of the practice, even where the underlying product is the same as an approved tool, because the account determines the contractual terms, the retention period and whether inputs are used for training. `forceLoginMethod` does not reach that: it restricts the sign-in method, not the account, so a personal Claude.ai subscription satisfies it. `forceLoginOrgUUID` is the key that enforces clause 6.8. It is omitted here rather than shipped with a placeholder because an invalid value blocks every login, so add it once with the real value.
+
+`CLAUDE_MATTER_ROOTS` carries a placeholder and the `hooks` block that reads it. Set it to the matters root and every alias that share answers to, or remove both the variable and the `hooks` block. Left as shipped, the guard fails closed and denies all file access. See "Keeping one session to one matter" below.
 
 `OTEL_EXPORTER_OTLP_ENDPOINT` carries a placeholder. Point the five OpenTelemetry keys at your collector. Claude audit logs record access metadata and not conversation content, so your own collector is the only record of what was sent, to which endpoint, on what date, and that record is what you would rely on if a claim of privilege or compliance with the Harman undertaking is contested. Clause 6.5(h) requires that what logging is available to the practice be established before a tool is approved, and clause 17.5 requires that a tool which cannot produce a record of what was sent to it have that limitation recorded in Schedules 1 and 8. The five keys are what stop that limitation applying. Deleting them is a choice to record it.
 
@@ -126,6 +128,22 @@ Managed settings parse tolerantly, so one bad entry is stripped rather than void
 | `permissions.deny` credential rules | Keep cloud credential stores, GPG keyrings, package registry tokens, git credential caches and private key material out of context entirely. |
 | `permissions.deny` settings rules | Prevent Claude editing the settings and shell profile files that constrain it. |
 | `claudeMd` | Injects the firm policy as organisation-managed memory in every session, so it operates as a standing instruction rather than a document nobody opens. |
+
+## Keeping one session to one matter
+
+`claudeMd` tells the practitioner to confine a session to one matter. That is an instruction, and an instruction is not a control. `hooks/matter-guard.js` is the control.
+
+It cannot do quite what you would expect. A `SessionStart` hook cannot block a session from starting, so nothing prevents a session being opened in the wrong place. What `PreToolUse` can do is block a tool call, and that yields a better guarantee than the one it replaces: not one session per matter, but **no session that touches two matters**. The first client path a session touches binds it, and every later path under a different matter is refused, whatever the session was doing beforehand.
+
+The guard runs on three events. `PreToolUse` does the enforcement across Read, Edit, Write, NotebookEdit, Grep, Glob and Bash. `SessionEnd` files the completed transcript into the matter folder, which is what makes the session record a record of the matter rather than a cache in a user profile. `SessionStart` names the bound matter as context, and is advisory only.
+
+Set `CLAUDE_MATTER_ROOTS` to the matters root, and list **every alias the share answers to**, separated by semicolons: the IP form, the hostname form, and any drive letter staff map to it. An unlisted alias is not recognised as client material, so the omission is silent and the guard simply does not see the matter. Deploy the script beside the managed settings file, or change the path in the `hooks` block.
+
+Matter identity is the folder name, so the same matter reached by any listed alias compares equal, and `..` and `.` are resolved before comparison, so a path that leaves the bound matter and re-enters another is caught rather than read as its first segment.
+
+The guard fails closed. If it is installed but `CLAUDE_MATTER_ROOTS` is unset, it denies all file access with an explanation rather than enforcing nothing, because a control that quietly does nothing is worse than no control: the practice believes it is protected. Remove the `hooks` block if you do not want the guard.
+
+Two limits, stated rather than buried. **Bash is confined by working directory, not by inspecting commands**, so a shell command can still read across matters; on macOS and WSL2 the Bash sandbox is the real boundary and should be enabled, and on native Windows there is no equivalent. And hooks are client-side: they constrain the model, not a determined user.
 
 ## The WebFetch hostname check
 
@@ -167,9 +185,9 @@ A Solicitor's Guide to Responsible Use of Artificial Intelligence, Law Society o
 
 These files are an enforcement layer for parts of four clauses of the policy, and no part of the rest.
 
-They reach clause 6, by confining sign-in and the servers a session can call; clause 7, by stating the prohibited uses as a standing instruction; clause 8, by stating the restricted categories and the four satisfactions required before any of them is used; and clause 16, through retention, local storage and access.
+They reach clause 6, by confining sign-in and the servers a session can call; clause 7, by stating the prohibited uses as a standing instruction; clause 8, by stating the restricted categories and the four satisfactions required before any of them is used; clause 16, through retention, local storage and access; and part of clause 17, because the session record is filed to the matter folder rather than left in a user profile.
 
-They do not reach clause 9, verification; clause 10, disclosure to courts and tribunals; clause 11, experts and counsel; clause 12, clients, their own terms and their consent; clause 14, costs; clause 15, recording and transcription; clause 17, the record of what was done; clause 18, training; clause 20, incidents; or clause 21, compliance. Those clauses are discharged by people, and a configuration cannot be written that discharges them.
+They do not reach clause 9, verification; clause 10, disclosure to courts and tribunals; clause 11, experts and counsel; clause 12, clients, their own terms and their consent; clause 14, costs; clause 15, recording and transcription; the rest of clause 17, since a transcript is not the structured record clause 17.2 requires; clause 18, training; clause 20, incidents; or clause 21, compliance. Those clauses are discharged by people, and a configuration cannot be written that discharges them.
 
 Two gaps are worth naming precisely, because they look like configuration problems and are not.
 
