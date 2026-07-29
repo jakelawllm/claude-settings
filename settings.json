@@ -50,11 +50,8 @@
       "Read(**/*.key)",
 
       "Edit(~/.claude/settings.json)",
-      "Write(~/.claude/settings.json)",
       "Edit(./.claude/settings.json)",
-      "Write(./.claude/settings.json)",
       "Edit(./.claude/settings.local.json)",
-      "Write(./.claude/settings.local.json)",
       "Edit(~/.zshrc)",
       "Edit(~/.bashrc)",
       "Edit(~/.profile)"
