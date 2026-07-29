@@ -28,6 +28,22 @@ Turn off the model training setting at `claude.ai/settings/data-privacy-controls
 
 Do not mistake that toggle for compliance. Clause 6.5(b) requires that the supplier not use inputs or outputs to train its models, "and that this is a term of the contract rather than a setting a user can alter". A toggle is a setting a user can alter. A consumer plan therefore cannot be entered in the Approved Tools Register at Schedule 1 whatever its configuration, and on such a plan `settings.json` is harm reduction for a tool the policy does not permit on client work, not an equivalent of the managed deployment. On Team, Enterprise or API access under commercial terms the position is set by contract and clause 6.5(b) is satisfied.
 
+## What your plan decides
+
+Clause 6 and clause 8 ask different questions, and a plan can pass the first and fail the second. This is the distinction that determines what the tool may be used on.
+
+| | Clause 6, approved tool | Clause 8, restricted information |
+|---|---|---|
+| Free, Pro, Max | No. Training is controlled by a user-held toggle, so clause 6.5(b) fails | No |
+| Team | Yes. No training is a term of the commercial contract | **No.** Zero data retention is not available below the enterprise tier, so prompts and outputs are retained for thirty days on infrastructure outside Australia |
+| Enterprise with zero data retention, or an in-region provider deployment | Yes | Capable of satisfying clause 8.3, if the practitioner establishes it and records what establishes it |
+
+The default position of this configuration is the middle row, because that is where most practices adopting it will sit. `claudeMd` accordingly states clause 8 material as a prohibition rather than an approval gate. Clause 8.7 already requires that result: where the practitioner cannot be satisfied of each of the four matters, the material is not to be used with any tool, and difficulty in establishing them is a reason not to proceed.
+
+If the practice is on Enterprise with zero data retention granted, or runs Claude Code through Amazon Bedrock, Google Cloud's Agent Platform or Microsoft Foundry with an Australian region and the retention position pinned in the tenancy, the third row may apply. That is a conclusion to reach on the practice's own contract and to record under clause 8.4, not one to inherit from this file. Restore the approval gate in `claudeMd` only after it has been reached.
+
+Australian Privacy Principle 8 sits alongside this and is not answered by retention alone. Sending personal information to United States infrastructure is a disclosure for which the practice remains accountable, and clause 6.5(d) requires the basis for satisfying APP 8 to be recorded before a tool is approved.
+
 Exclude the `.claude` directory from OneDrive, Dropbox, iCloud Drive, roaming profiles and any consumer backup agent, and keep whole-disk encryption on. Session transcripts are written there in plaintext. They are the firm's own records on the firm's own machine, so they are not a disclosure to anyone, but a sync client that replicates the home directory turns them into one by a route nobody assessed.
 
 ## Installation
