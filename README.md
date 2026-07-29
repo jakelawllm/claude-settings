@@ -16,7 +16,7 @@ It is offered for comparison and adaptation. It is a configuration baseline, not
 >
 > **The matter guard is not a security boundary on its own.** It constrains the model, not a determined user, and it does not parse shell commands: a Bash command can still address another matter directly. What contains Bash is the operating system sandbox, enabled in `managed-settings.json`.
 >
-> **Native Windows is not a supported platform for matter isolation.** The sandbox does not run there. The shipped settings set `failIfUnavailable`, so Claude Code will refuse to start rather than run without the boundary it claims. Use macOS, Linux, or Windows with Claude Code inside WSL2.
+> **Native Windows is not a supported platform for matter isolation.** The sandbox does not run there, and the shipped settings set `failIfUnavailable` to `false`, so Claude Code starts anyway. On those machines nothing at the operating system level contains a Bash command, and matter separation rests on the hook alone, which is advisory. Use macOS, Linux, or Windows with Claude Code inside WSL2 if the boundary needs to hold. If you deploy to native Windows, record in Schedule 8 that isolation is advisory there.
 >
 > **The tool list is fixed.** New built-in tools, plugin tools and MCP tools fall outside the guard until it is updated for them.
 
@@ -34,7 +34,9 @@ It is offered for comparison and adaptation. It is a configuration baseline, not
 
 `hooks/matter-guard.js` keeps one session to one matter and files the session record to the matter folder. It is the only part of this repository that enforces something the settings keys cannot express, and it is wired up in `managed-settings.json`. `tests/matter-guard.test.js` is its test suite; run it before deploying a change to the hook, because two of its cases exist for bugs that were live in earlier drafts.
 
-`ai-policy-legal-practice-template.docx` is the policy these files exist to enforce, as a template for an Australian practice. `ai-policy-legal-practice-template.md` is a rendering of it produced by `scripts/docx-to-md.py`, so that it can be read and diffed here. The `.docx` is the authoritative document. The policy governs: where it and the configuration differ, the configuration is wrong.
+`ai-policy-legal-practice-template.docx` is the policy these files exist to enforce, as a template for an Australian practice. `ai-policy-legal-practice-template.md` is a rendering of it produced by `scripts/docx-to-md.py`, so that it can be read and diffed here. The `.docx` is the authoritative document, and where it and the configuration differ the configuration is ordinarily what needs correcting.
+
+There is one deliberate exception. Clause 7.3 prohibits using a tool to draft an expert report "without prior leave of the court where leave is required", so the clause permits the work once leave is obtained. `claudeMd` and the compliance skill prohibit it outright and do not ask about leave. That is a practice deciding to be stricter than its own policy, not a drafting error: a firm adopting this template either amends clause 7.3 to match, or relaxes the two instruments to match the clause. It should not be left as it stands here without a decision, because a practitioner reading the policy would be told the work is available and the tool would refuse it.
 
 ## Before you deploy anything
 
@@ -134,7 +136,7 @@ Two settings decide how firmly this holds. `allowManagedHooksOnly` is already se
 
 `allowedMcpServers` ships **empty**, so no MCP server loads. That is deliberate. An entry of the form `{"serverName": "context7"}` matches a display name, and a display name is chosen by whoever configures the server: a different server presenting the same name satisfies the rule. Anthropic's managed MCP documentation recommends `serverUrl` where the match must survive a rename, and the same reasoning applies to an allowlist. Identify an approved server by its exact URL or command, not its label. An MCP server is itself a tool for the purposes of clause 6, so each one needs an assessment under clause 6.5 and an entry in Schedule 1 before it is added, not after.
 
-`sandbox` is enabled, with `failIfUnavailable` and `allowUnsandboxedCommands: false`. This is the only part of the baseline the operating system enforces rather than the client, and it is what actually contains a Bash command. `failIfUnavailable` means Claude Code refuses to start where the sandbox cannot run, which on native Windows is always. That is the intended behaviour: a session that silently continues without the boundary is worse than one that will not start. If a practice accepts the weaker position, set `failIfUnavailable` to `false` and treat matter isolation as advisory on that machine — and say so in Schedule 8.
+`sandbox` is enabled, with `failIfUnavailable` and `allowUnsandboxedCommands: false`. This is the only part of the baseline the operating system enforces rather than the client, and it is what actually contains a Bash command. `failIfUnavailable` ships as `false`, so a machine without a sandbox still runs. That is a deliberate deployability choice and it has a cost: on native Windows there is no operating system boundary at all, and Bash can reach another matter regardless of the hook. Set it to `true` to make Claude Code refuse to start rather than run unprotected, which is the stronger position and the one to take if the fleet is macOS, Linux or WSL2. Either way, record which machines are which in Schedule 8.
 
 `requiredMinimumVersion` blocks startup below the stated version. Confirm the fleet is at or above it before pushing, or drop to `minimumVersion`, which governs updates without blocking a session.
 
@@ -278,4 +280,4 @@ The platform difference matters and is not cosmetic. The Bash sandbox, which is 
 
 MIT. Adapt freely. Attribution appreciated but not required.
 
-This is published for reference and adaptation rather than as a collaborative project. Issues and pull requests are not monitored. Fork it and make it yours. Where a key here turns out to be misused or superseded, the controlling reference is `https://code.claude.com/docs/en/settings` rather than this file or its author.
+This is published for reference and adaptation rather than as a collaborative project. Issues are disabled and pull requests are not monitored. The two Claude workflows in `.github/workflows` exist for the maintainer's own use on their own pull requests; they are not an invitation, and a pull request from a fork will not have the secrets those workflows need. Fork it and make it yours. Where a key here turns out to be misused or superseded, the controlling reference is `https://code.claude.com/docs/en/settings` rather than this file or its author.
