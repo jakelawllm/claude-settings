@@ -84,13 +84,15 @@ File-based and MDM delivery work on any plan, because they are enforced on the d
 
 The user file goes to `~/.claude/settings.json`, or `%USERPROFILE%\.claude\settings.json` on Windows.
 
-## Change these six things first
+## Change these seven things first
 
 `claudeMd` opens with `REPLACE-WITH-YOUR-FIRM-NAME`. Substitute the practice's own name, and read the policy text through before you deploy it. It is one firm's position on scope, evidence, verification and records, and it is enforced as a standing instruction in every session, so it should say what your practice has actually decided rather than what this file happens to say.
 
 `forceLoginOrgUUID` is not in the file and must be added, with the practice's real Anthropic organisation UUID. Clause 6.8 prohibits the use of a personal account for any work of the practice, even where the underlying product is the same as an approved tool, because the account determines the contractual terms, the retention period and whether inputs are used for training. `forceLoginMethod` does not reach that: it restricts the sign-in method, not the account, so a personal Claude.ai subscription satisfies it. `forceLoginOrgUUID` is the key that enforces clause 6.8. It is omitted here rather than shipped with a placeholder because an invalid value blocks every login, so add it once with the real value.
 
-`CLAUDE_MATTER_ROOTS` carries a placeholder and the `hooks` block that reads it. Set it to the matters root and every alias that share answers to, or remove both the variable and the `hooks` block. Left as shipped, the guard fails closed and denies all file access. See "Keeping one session to one matter" below.
+`CLAUDE_MATTER_ROOTS` carries a placeholder and the `hooks` block that reads it. Set it to the matters root and every alias that share answers to, or remove both the variable and the `hooks` block.
+
+`CLAUDE_MATTER_MODE` ships as `warn`, so the guard observes and reports without refusing anything. That is the right setting while the matters root is being established and the aliases confirmed, and the wrong setting to leave in place. Move it to `enforce` once the log of what it would have blocked is empty of surprises.
 
 `OTEL_EXPORTER_OTLP_ENDPOINT` carries a placeholder. Point the five OpenTelemetry keys at your collector. Claude audit logs record access metadata and not conversation content, so your own collector is the only record of what was sent, to which endpoint, on what date, and that record is what you would rely on if a claim of privilege or compliance with the Harman undertaking is contested. Clause 6.5(h) requires that what logging is available to the practice be established before a tool is approved, and clause 17.5 requires that a tool which cannot produce a record of what was sent to it have that limitation recorded in Schedules 1 and 8. The five keys are what stop that limitation applying. Deleting them is a choice to record it.
 
@@ -141,7 +143,11 @@ Set `CLAUDE_MATTER_ROOTS` to the matters root, and list **every alias the share 
 
 Matter identity is the folder name, so the same matter reached by any listed alias compares equal, and `..` and `.` are resolved before comparison, so a path that leaves the bound matter and re-enters another is caught rather than read as its first segment.
 
-The guard fails closed. If it is installed but `CLAUDE_MATTER_ROOTS` is unset, it denies all file access with an explanation rather than enforcing nothing, because a control that quietly does nothing is worse than no control: the practice believes it is protected. Remove the `hooks` block if you do not want the guard.
+`CLAUDE_MATTER_MODE` has three settings. In `enforce` the guard refuses cross-matter access. In `warn` it allows the access, says so in the session, and appends a line to `would-have-blocked.log` in its state directory: that log is the point of the observation period, because it is the list of accesses enforcement would refuse, and an empty one is the evidence for turning enforcement on. In `off` it does nothing.
+
+In `enforce` the guard fails closed. Installed with `CLAUDE_MATTER_ROOTS` unset, it denies all file access with an explanation rather than enforcing nothing, because a control that quietly does nothing is worse than no control: the practice believes it is protected. In `warn` it stands down instead, which is what makes `warn` usable before the root exists. Remove the `hooks` block if you do not want the guard at all.
+
+`SessionEnd` files the transcript to the matter's own folder, under `_ai-record`. Set `CLAUDE_RECORD_ROOT` to file every session into one designated archive instead, as `<CLAUDE_RECORD_ROOT>/<matter>/`. A single archive is easier to place under one retention and destruction schedule and easier to audit; the matter folder keeps the record beside the file it belongs to. Either way the location must sit inside the practice's own backup, and inside its destruction schedule — a location that is backed up but never destroyed is not a retention policy, it is an accumulation.
 
 Two limits, stated rather than buried. **Bash is confined by working directory, not by inspecting commands**, so a shell command can still read across matters; on macOS and WSL2 the Bash sandbox is the real boundary and should be enabled, and on native Windows there is no equivalent. And hooks are client-side: they constrain the model, not a determined user.
 

@@ -6,12 +6,13 @@
  * The hook is driven as a child process with real JSON payloads, deliberately:
  * an earlier shell-based harness reported false passes twice, once because a
  * synchronous stdin read throws on Windows and once because asynchronous
- * stdout writes were lost through command substitution. Both failures looked
- * like "allowed", which is the dangerous direction for a control of this kind.
+ * stdout writes were lost through command substitution. Both looked like
+ * "allowed", which is the dangerous direction for a control of this kind.
  *
- * Cases 2 and 11 are regressions for bugs this harness found: the same matter
- * reached by a second alias was denied, and a path leaving the bound matter
- * via ".." was allowed.
+ * Regressions for bugs this harness found: case 2, the same matter reached by
+ * a second alias was denied; case 11, a path leaving the bound matter via ".."
+ * was allowed; case 17, the archive wrote to the identity token instead of a
+ * real directory.
  */
 const { spawnSync } = require('child_process');
 const path = require('path');
@@ -104,6 +105,80 @@ check('11 traversal out of bound matter', decision(pre('s1', 'Read', SMITH + '\\
     /* leave empty: parses as allow, which fails the check as it should */
   }
   check('12 unconfigured guard fails closed', decision(out), 'deny');
+}
+
+// Warn mode allows the cross-matter access but must still say something.
+{
+  const w = { ...env, CLAUDE_MATTER_MODE: 'warn' };
+  const call2 = (ev, e) => {
+    const r = spawnSync(process.execPath, [HOOK], {
+      input: JSON.stringify(ev), encoding: 'utf8', env: e,
+    });
+    try { return JSON.parse(r.stdout); } catch { return {}; }
+  };
+  const bind = { hook_event_name: 'PreToolUse', session_id: 'w1', tool_name: 'Read',
+                 tool_input: { file_path: SMITH + '\\a.docx' }, cwd: SMITH };
+  call2(bind, w);
+  const cross = { ...bind, tool_input: { file_path: JONES + '\\b.docx' } };
+  const out = call2(cross, w);
+  check('13 warn mode allows', decision(out), 'allow');
+  check('14 warn mode still reports', out.systemMessage ? 'yes' : 'no', 'yes');
+}
+
+// Off mode does nothing at all.
+{
+  const o = { ...env, CLAUDE_MATTER_MODE: 'off' };
+  const r = spawnSync(process.execPath, [HOOK], {
+    input: JSON.stringify({ hook_event_name: 'PreToolUse', session_id: 'o1',
+      tool_name: 'Read', tool_input: { file_path: JONES + '\\b.docx' }, cwd: SMITH }),
+    encoding: 'utf8', env: o,
+  });
+  check('15 off mode is silent', r.stdout.trim() === '' ? 'silent' : 'spoke', 'silent');
+}
+
+// Unconfigured + warn must stand down rather than fail closed.
+{
+  const bare = { ...process.env, CLAUDE_MATTER_MODE: 'warn' };
+  delete bare.CLAUDE_MATTER_ROOTS;
+  const r = spawnSync(process.execPath, [HOOK], {
+    input: JSON.stringify({ hook_event_name: 'PreToolUse', session_id: 'w2',
+      tool_name: 'Read', tool_input: { file_path: 'C:\\x.txt' }, cwd: 'C:\\tmp' }),
+    encoding: 'utf8', env: bare,
+  });
+  let out = {}; try { out = JSON.parse(r.stdout); } catch {}
+  check('16 unconfigured + warn does not block', decision(out), 'allow');
+}
+
+// SessionEnd must resolve a real directory, not the identity token.
+{
+  const os = require('os');
+  const fakeMatter = path.join(os.tmpdir(), 'guard-archive-test', 'Smith');
+  fs.mkdirSync(fakeMatter, { recursive: true });
+  const tr = path.join(os.tmpdir(), 'guard-archive-test', 'transcript.jsonl');
+  fs.writeFileSync(tr, '{"x":1}\n');
+  const localRoot = path.join(os.tmpdir(), 'guard-archive-test');
+  const e2 = { ...env, CLAUDE_MATTER_ROOTS: localRoot };
+  spawnSync(process.execPath, [HOOK], {
+    input: JSON.stringify({ hook_event_name: 'PreToolUse', session_id: 'a1',
+      tool_name: 'Read', tool_input: { file_path: path.join(fakeMatter, 'f.txt') },
+      cwd: fakeMatter }), encoding: 'utf8', env: e2 });
+  spawnSync(process.execPath, [HOOK], {
+    input: JSON.stringify({ hook_event_name: 'SessionEnd', session_id: 'a1',
+      cwd: fakeMatter, transcript_path: tr, reason: 'other' }),
+    encoding: 'utf8', env: e2 });
+  const archived = fs.existsSync(path.join(fakeMatter, '_ai-record'))
+    && fs.readdirSync(path.join(fakeMatter, '_ai-record')).length > 0;
+  check('17 transcript filed to matter folder', archived ? 'filed' : 'missing', 'filed');
+
+  const central = path.join(os.tmpdir(), 'guard-archive-test', 'central');
+  const e3 = { ...e2, CLAUDE_RECORD_ROOT: central };
+  spawnSync(process.execPath, [HOOK], {
+    input: JSON.stringify({ hook_event_name: 'SessionEnd', session_id: 'a1',
+      cwd: fakeMatter, transcript_path: tr, reason: 'other' }),
+    encoding: 'utf8', env: e3 });
+  const centralOk = fs.existsSync(path.join(central, 'smith'))
+    && fs.readdirSync(path.join(central, 'smith')).length > 0;
+  check('18 transcript filed to central archive', centralOk ? 'filed' : 'missing', 'filed');
 }
 
 console.log('\nbinding state:');

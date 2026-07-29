@@ -31,10 +31,29 @@ const os = require('os');
 const path = require('path');
 
 const ARCHIVE_DIR = process.env.CLAUDE_MATTER_ARCHIVE || '_ai-record';
+
+/**
+ * Where the session record is filed.
+ *   unset  the matter's own folder, under ARCHIVE_DIR
+ *   set    <CLAUDE_RECORD_ROOT>/<matter>, a single designated archive
+ * A central archive is easier to place under one retention and destruction
+ * schedule; the matter folder keeps the record beside the file it belongs to.
+ */
+const RECORD_ROOT = process.env.CLAUDE_RECORD_ROOT || '';
+
+/**
+ * enforce  block cross-matter access (default)
+ * warn     allow it, but say so and write an audit line, for a rollout that
+ *          observes before it blocks
+ * off      do nothing
+ */
+const MODE = (process.env.CLAUDE_MATTER_MODE || 'enforce').toLowerCase();
+
 const STATE_DIR = path.join(
   process.env.LOCALAPPDATA || os.tmpdir(),
   'claude-matter-guard'
 );
+const AUDIT_LOG = path.join(STATE_DIR, 'would-have-blocked.log');
 
 /** Paths under these are client material. Compared canonically, never raw. */
 function matterRoots() {
@@ -94,8 +113,9 @@ function matterOf(candidate) {
     const name = c.slice(root.length + 1).split('/')[0];
     // Identity is the matter name, not the path. Every configured root is an
     // alias of the same share, so the same matter reached by its IP, its
-    // hostname or a mapped drive must compare equal.
-    return { root, name, full: 'matter:' + name };
+    // hostname or a mapped drive must compare equal. `dir` keeps the real
+    // location, which identity deliberately discards.
+    return { root, name, full: 'matter:' + name, dir: root + '/' + name };
   }
   return null;
 }
@@ -162,16 +182,52 @@ function deny(reason) {
   return true;
 }
 
+/**
+ * Warn mode: allow the access, but record it and say so. The log is what makes
+ * the observation period worth running — it is the list of accesses that
+ * enforce mode would have refused, which is the evidence for turning it on.
+ */
+function warn(ev, binding, touched) {
+  try {
+    fs.mkdirSync(STATE_DIR, { recursive: true });
+    fs.appendFileSync(
+      AUDIT_LOG,
+      JSON.stringify({
+        session: ev.session_id,
+        tool: ev.tool_name,
+        bound_matter: binding.name,
+        reached_matter: touched.name,
+      }) + '\n',
+      'utf8'
+    );
+  } catch {
+    /* an audit write failure must not change the outcome of the tool call */
+  }
+  emit({
+    systemMessage:
+      `Matter separation warning: this session is bound to "${binding.name}" ` +
+      `and just reached "${touched.name}". Allowed because the guard is in ` +
+      `warn mode. In enforce mode this would have been refused.`,
+  });
+  return true;
+}
+
 function preToolUse(ev) {
-  // Fail closed. If the guard is installed but unconfigured it cannot tell
-  // client material from anything else, and a guard that quietly enforces
-  // nothing is worse than no guard: the practice believes it is protected.
+  if (MODE === 'off') return;
+
+  // Fail closed in enforce mode. If the guard is installed but unconfigured it
+  // cannot tell client material from anything else, and a guard that quietly
+  // enforces nothing is worse than no guard: the practice believes it is
+  // protected. In warn mode there is nothing to warn about, so it stands down.
   if (matterRoots().length === 0) {
+    if (MODE !== 'enforce') return;
     return deny(
       `The matter separation guard is installed but CLAUDE_MATTER_ROOTS is ` +
         `not set, so it cannot identify client material and is refusing all ` +
         `file access. This is a deployment fault, not a decision about this ` +
-        `task. Report it to the AI Officer before continuing any client work.`
+        `task. Report it to the AI Officer before continuing any client work. ` +
+        `To run the guard without enforcing it while the matters root is ` +
+        `being set up, set CLAUDE_MATTER_MODE=warn.`
     );
   }
 
@@ -183,11 +239,12 @@ function preToolUse(ev) {
 
   for (const t of touched) {
     if (!binding) {
-      binding = { matter: t.full, name: t.name };
+      binding = { matter: t.full, name: t.name, dir: t.dir };
       writeBinding(ev.session_id, binding);
       continue;
     }
     if (t.full !== binding.matter) {
+      if (MODE === 'warn') return warn(ev, binding, t);
       return deny(
         `Blocked by the firm's matter-separation policy. This session is ` +
           `confined to the matter "${binding.name}" and the path requested ` +
@@ -213,12 +270,15 @@ function sessionStart(ev) {
 /** File the transcript on the matter. SessionEnd guarantees it is complete. */
 function sessionEnd(ev) {
   const binding = readBinding(ev.session_id) || matterOf(ev.cwd);
-  const matter = binding && (binding.matter || binding.full);
-  if (!matter || !ev.transcript_path) return;
+  if (!binding || !binding.dir || !binding.name || !ev.transcript_path) return;
 
   try {
     if (!fs.existsSync(ev.transcript_path)) return;
-    const dest = path.join(matter.replace(/\//g, path.sep), ARCHIVE_DIR);
+    // binding.dir is the real location; binding.matter is an identity token
+    // and is deliberately not a path.
+    const dest = RECORD_ROOT
+      ? path.join(RECORD_ROOT, binding.name)
+      : path.join(binding.dir.replace(/\//g, path.sep), ARCHIVE_DIR);
     fs.mkdirSync(dest, { recursive: true });
     const stamp = fs
       .statSync(ev.transcript_path)
