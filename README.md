@@ -166,6 +166,61 @@ Two cases in the unit suite assert what the guard does **not** do: that a Bash c
 
 Every case must pass. Two cases are skipped on Windows, where POSIX permission bits do not apply; CI runs them on Linux and macOS. A hook that crashes or is misconfigured is not obviously broken from inside a session: in `warn` it says nothing, and in `enforce` a fault that stops it running removes the boundary rather than announcing itself. The suite is the only thing that tells you the guard still works.
 
+## Production go/no-go checklist
+
+This repository is not production-ready as shipped. It is a beta reference implementation, and a practice adopting it should start from no-go for production unless the items below have been resolved in its own deployment.
+
+If any red item remains unresolved, the answer is no-go for production. If the red items are cleared but the amber items remain, the most this baseline supports is a limited internal pilot. A production go requires the green conditions to be met and recorded by the practice deploying it.
+
+### Red — no-go for production unless fixed
+
+- The guard still runs in `warn`, or `CLAUDE_MATTER_ROOTS` still carries placeholders rather than the practice's real roots.
+- Native Windows is being treated as though it provided hard matter isolation. It does not: where the boundary needs to hold, use macOS, Linux, or Windows with Claude Code inside WSL2.
+- The real Claude Code end-to-end tier has not been run on the deployment candidate, so the hook has not been shown to run inside a real session with the payload Claude Code actually sends.
+- The deliberate mismatch on expert reports remains unresolved: the policy permits the work where prior leave is obtained, while the standing instruction and compliance skill prohibit it outright.
+- There is no versioned release point, rollback path, or named internal owner for maintaining the baseline against Claude Code changes.
+
+### Amber — pilot only unless tightened
+
+- Deployment still depends on manual, platform-specific hook path edits rather than a platform-specific managed artefact or packaging step.
+- The sandbox posture is still permissive where isolation depends on it, including fleets that tolerate `failIfUnavailable: false` on machines where the operating system boundary must hold.
+- There is no operational check for hook health, missing `_ai-record` archives, or drift in supported tool surfaces and Claude Code versions.
+- New built-in tools, plugin tools, and MCP tools are enabled without a release-time review of whether the guard actually covers them.
+
+### Green — minimum conditions for a production go
+
+- The deployed settings are enforce-ready: real matter roots are configured, the observation period is finished, and `CLAUDE_MATTER_MODE` has moved to `enforce`.
+- The supported-platform policy is explicit, and any platform where isolation is only advisory is excluded from production use or recorded as such in the practice's own deployment record.
+- Real-session verification has been completed on the supported platforms, including the opt-in E2E tier and an actual cross-matter refusal smoke test.
+- The practice has a versioned deployment artefact, a rollback step to the previous known-good baseline, and an internal owner responsible for Claude Code version drift and revalidation.
+- The policy, the standing instruction, and the compliance skill say the same thing about expert reports and any other load-bearing production rule.
+- The practice has monitoring or reconciliation for hook failures, transcript filing gaps, and other operational faults that would otherwise leave the boundary looking active when it is not.
+
+### Practical checklist
+
+- Governance and ownership
+  - A named internal owner is responsible for release, verification, rollback, and compatibility review.
+  - The adopting practice has recorded whether this deployment is a limited pilot or a production control set.
+- Policy and legal alignment
+  - The expert-report position has been resolved across the policy, the standing instruction, and the compliance skill.
+  - The practice's own verification process for citations, evidentiary references, and disclosures is in place.
+- Enforcement and supported platforms
+  - `CLAUDE_MATTER_ROOTS` contains the real roots and aliases.
+  - `CLAUDE_MATTER_MODE` is `enforce` once the `would-have-blocked` log is empty of surprises.
+  - Platforms without a real operating system boundary for Bash are excluded from production where the boundary needs to hold.
+- Deployment and verification
+  - The hook path has been set for each deployed platform.
+  - `claude doctor`, `/status`, and the guard test suite have been run on the deployment candidate.
+  - `CLAUDE_E2E=1 node tests/e2e.test.js` or an equivalent real-session gate has been run before production rollout.
+- Release, rollback and support
+  - The deployment has a versioned release point and a documented rollback path.
+  - The practice is not relying on this repository for upstream support, issue handling, or release monitoring.
+- Monitoring and records integrity
+  - The practice has a way to detect hook launch failure, missing archives, and drift in the deployed baseline.
+  - Transcript filing is treated as a monitored operational control, not a guarantee.
+
+In short: no red item, no unexamined amber item, and no production go without a conscious decision by the practice deploying it.
+
 ## What the settings do
 
 | Key | Purpose |
