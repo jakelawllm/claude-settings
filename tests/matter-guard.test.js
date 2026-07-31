@@ -16,9 +16,17 @@
 'use strict';
 
 const { spawnSync } = require('child_process');
+const { createHash } = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+
+/** Mirrors hooks/matter-guard.js statePath(): sessions are named by a
+ * domain-separated SHA-256 hash, not the raw session ID, so a collapsed or
+ * lossily-sanitised ID cannot collide with another session's state file. */
+function stateFileFor(sessionId) {
+  return createHash('sha256').update('matter-guard:' + String(sessionId)).digest('hex') + '.json';
+}
 
 const HOOK = process.argv[2] || path.join(__dirname, '..', 'hooks', 'matter-guard.js');
 const LINK_TYPE = process.platform === 'win32' ? 'junction' : 'dir';
@@ -99,7 +107,7 @@ check(
   'deny'
 );
 check('07 non-client path untouched', decision(pre('s1', 'Read', path.join(TMP, 'x.md'), SMITH)), 'allow');
-check('08 matters root is not a matter', decision(pre('s9', 'Glob', MATTERS, TMP)), 'allow');
+check('08 matters root itself is denied (SEC-03)', decision(pre('s9', 'Glob', MATTERS, TMP)), 'deny');
 check('09 separate session binds separately', decision(pre('s2', 'Read', path.join(JONES, 'b.txt'), JONES)), 'allow');
 
 // Regression: identity was the full path, so the same matter reached by a
@@ -174,7 +182,7 @@ check(
 freshState();
 pre('s7', 'Read', path.join(SMITH, 'a.txt'), SMITH);
 fs.mkdirSync(STATE, { recursive: true }); // the binding write may not have run
-fs.writeFileSync(path.join(STATE, 's7.json'), '{ this is not json');
+fs.writeFileSync(path.join(STATE, stateFileFor('s7')), '{ this is not json');
 check('19 corrupt state refuses (C-01)', decision(pre('s7', 'Read', path.join(SMITH, 'a.txt'), SMITH)), 'deny');
 
 // -- modes -----------------------------------------------------------------
@@ -297,19 +305,28 @@ check(
   'deny'
 );
 
-if (aliasMade) {
+// Test 34 — two genuinely distinct roots that each contain a 'Smith' subfolder.
+// The root-qualified identity (SEC-05) must treat them as different matters,
+// so binding to Smith under MATTERS2A must refuse access to Smith under MATTERS2B.
+{
+  const MATTERS2A = path.join(TMP, 'matters2a');
+  const MATTERS2B = path.join(TMP, 'matters2b');
+  const SMITH2A = path.join(MATTERS2A, 'Smith');
+  const SMITH2B = path.join(MATTERS2B, 'Smith');
+  for (const d of [SMITH2A, SMITH2B]) fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(SMITH2A, 'a.txt'), 'a2');
+  fs.writeFileSync(path.join(SMITH2B, 'a.txt'), 'b2');
+
   freshState();
-  const twoRootEnv = baseEnv({ CLAUDE_MATTER_ROOTS: [MATTERS, ALIAS].join(';') });
-  // Bind to Smith under MATTERS root
-  pre('s11', 'Read', path.join(SMITH, 'a.txt'), SMITH, twoRootEnv);
-  // Access Smith under ALIAS root — same name, different root → different identity → denied
+  const twoDistinctEnv = baseEnv({ CLAUDE_MATTER_ROOTS: [MATTERS2A, MATTERS2B].join(';') });
+  // Bind session to Smith under MATTERS2A
+  pre('s11', 'Read', path.join(SMITH2A, 'a.txt'), SMITH2A, twoDistinctEnv);
+  // Access Smith under MATTERS2B — same name, but different root → different identity → denied
   check(
-    '34 same matter name under different roots is treated as distinct',
-    decision(pre('s11', 'Read', path.join(ALIAS, 'Smith', 'a.txt'), SMITH, twoRootEnv)),
+    '34 same matter name under distinct roots is treated as distinct (SEC-05)',
+    decision(pre('s11', 'Read', path.join(SMITH2B, 'a.txt'), SMITH2A, twoDistinctEnv)),
     'deny'
   );
-} else {
-  console.log('SKIP  34 same-name-different-root case (link creation unavailable)');
 }
 
 // -- state hygiene (H-03) --------------------------------------------------
@@ -318,7 +335,7 @@ if (process.platform !== 'win32') {
   freshState();
   pre('p1', 'Read', path.join(SMITH, 'a.txt'), SMITH);
   check('28 state directory is private', (fs.statSync(STATE).mode & 0o777).toString(8), '700');
-  check('29 state file is private', (fs.statSync(path.join(STATE, 'p1.json')).mode & 0o777).toString(8), '600');
+  check('29 state file is private', (fs.statSync(path.join(STATE, stateFileFor('p1'))).mode & 0o777).toString(8), '600');
 } else {
   console.log('SKIP  28-29 POSIX permission bits (Windows uses ACLs)');
 }

@@ -209,11 +209,21 @@ function resolveRoots() {
   if (usable.length === 0) {
     return { roots: [], error: 'no configured matters root is reachable from this machine' };
   }
-  const seen = new Set();
-  for (const r of usable) {
-    if (seen.has(r)) return { roots: [], error: 'duplicate configured roots resolve to the same canonical path: ' + r };
-    seen.add(r);
-  }
+  // Deduplicate: multiple configured roots that resolve to the same canonical
+  // path are one root under different aliases (IP form, hostname form, a
+  // mapped drive letter) — collapsing them is the whole point of allowing
+  // more than one entry in CLAUDE_MATTER_ROOTS, so this is silent, not fatal.
+  // Two configured roots that are genuinely distinct locations are still kept
+  // separate, and the root-qualified matter identity below (SEC-05) prevents
+  // a same-named matter under two distinct roots from being treated as one.
+  const seenRoots = new Set();
+  const deduped = usable.filter((r) => {
+    if (seenRoots.has(r)) return false;
+    seenRoots.add(r);
+    return true;
+  });
+  usable.length = 0;
+  deduped.forEach((r) => usable.push(r));
   if (RECORD_ROOT) usable.push(realCanonical(RECORD_ROOT));
 
   // Longest first: an archive nested inside the matters root must match as the

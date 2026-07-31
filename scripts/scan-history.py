@@ -56,6 +56,9 @@ ALLOW = [
     re.compile(r"scripts/scan-history\.py"),  # this file states the patterns
     re.compile(r"example\.invalid"),
     re.compile(r"nas\.example"),
+    # GitHub Actions pinned commit SHAs appear as `uses: owner/action@<40hexchars>`
+    # and trip the high-entropy check; they are version pins, not secrets.
+    re.compile(r"uses:\s+\S+@[0-9a-f]{40}"),
 ]
 
 _HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
