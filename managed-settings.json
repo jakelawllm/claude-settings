@@ -11,9 +11,9 @@
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "REPLACE-WITH-YOUR-COLLECTOR-OR-DELETE-THESE-FIVE-KEYS",
     "CLAUDE_MATTER_ROOTS": "REPLACE-WITH-YOUR-MATTERS-ROOT-AND-EVERY-ALIAS-SEMICOLON-SEPARATED",
-    "CLAUDE_MATTER_MODE": "warn",
-    "_telemetry_note": "Telemetry routes to the firm OTLP collector. Content (prompts/responses) is NOT captured — only metadata: that a session occurred, tool counts, token counts. Set OTEL_EXPORTER_OTLP_ENDPOINT to your collector endpoint."
+    "CLAUDE_MATTER_MODE": "warn"
   },
+  "_telemetry_note": "Telemetry routes to the firm OTLP collector. Content (prompts/responses) is NOT captured — only metadata: that a session occurred, tool counts, token counts. Set OTEL_EXPORTER_OTLP_ENDPOINT to your collector endpoint.",
   "cleanupPeriodDays": 7,
   "feedbackSurveyRate": 0,
   "autoUpdatesChannel": "stable",
@@ -89,7 +89,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Read|Edit|Write|NotebookEdit|Grep|Glob|Bash",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
