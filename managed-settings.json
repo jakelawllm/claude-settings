@@ -1,10 +1,9 @@
 {
+  "_template_comment": "DEPLOYMENT TEMPLATE — DO NOT USE VERBATIM IN PRODUCTION. REPLACE-WITH-... placeholders must be replaced with real values. CLAUDE_MATTER_MODE is set to warn for observation; set to enforce for production. failIfUnavailable is false for environments without sandbox support; set to true for production. See docs/production-architecture.md for deployment guidance.",
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "DISABLE_FEEDBACK_COMMAND": "1",
-    "DISABLE_TELEMETRY": "1",
-    "DISABLE_ERROR_REPORTING": "1",
     "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
     "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
     "OTEL_METRICS_EXPORTER": "otlp",
@@ -12,13 +11,15 @@
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "REPLACE-WITH-YOUR-COLLECTOR-OR-DELETE-THESE-FIVE-KEYS",
     "CLAUDE_MATTER_ROOTS": "REPLACE-WITH-YOUR-MATTERS-ROOT-AND-EVERY-ALIAS-SEMICOLON-SEPARATED",
-    "CLAUDE_MATTER_MODE": "warn"
+    "CLAUDE_MATTER_MODE": "warn",
+    "_telemetry_note": "Telemetry routes to the firm OTLP collector. Content (prompts/responses) is NOT captured — only metadata: that a session occurred, tool counts, token counts. Set OTEL_EXPORTER_OTLP_ENDPOINT to your collector endpoint."
   },
   "cleanupPeriodDays": 7,
   "feedbackSurveyRate": 0,
   "autoUpdatesChannel": "stable",
   "requiredMinimumVersion": "2.1.219",
   "forceLoginMethod": "claudeai",
+  "forceLoginOrgUUID": "REPLACE-WITH-YOUR-FIRM-CLAUDE-ORG-UUID",
   "forceRemoteSettingsRefresh": true,
   "disableArtifact": true,
   "disableRemoteControl": true,
@@ -57,6 +58,9 @@
       "Bash(telnet:*)",
       "Bash(sudo:*)",
       "Bash(osascript:*)",
+      "Bash(powershell:*)",
+      "Bash(pwsh:*)",
+      "Bash(cmd.exe:*)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(./secrets/**)",
@@ -115,6 +119,7 @@
       }
     ]
   },
+  "_failIfUnavailable_note": "SET TO true IN PRODUCTION. false here only for observation period deployments where sandbox may be unavailable.",
   "sandbox": {
     "enabled": true,
     "failIfUnavailable": false,

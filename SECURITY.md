@@ -8,9 +8,9 @@ This is a beta reference implementation. It has not had independent security rev
 
 Read this before relying on any part of it.
 
-**The operating system sandbox is the boundary.** `managed-settings.json` enables it with `failIfUnavailable`, so a session refuses to start where it cannot run. That is what contains a Bash command and its child processes.
+**The operating system sandbox is the boundary.** That is what contains a Bash command and its child processes. The template ships with `failIfUnavailable: false` for deployment observation periods. A production deployment MUST set this to true.
 
-**The matter guard is not a boundary on its own.** `hooks/matter-guard.js` constrains the model, not a determined user. It covers a fixed list of file tools, does not parse shell commands, and does not see tools it has not been told about — new built-ins, plugin tools and MCP tools included. On a machine without the sandbox it is advisory for those routes, and native Windows has no sandbox.
+**The matter guard is not a boundary on its own.** `hooks/matter-guard.js` constrains the model, not a determined user. It covers a fixed list of file tools, does not parse shell commands, and does not see tools it has not been told about — new built-ins, plugin tools and MCP tools included. On a machine without the sandbox it is advisory for those routes. Native Windows has no equivalent OS sandbox; the guard is advisory for Bash on that platform. Production deployments should use macOS, Linux, or Windows with Claude Code inside WSL2.
 
 **Managed settings are a client-side control.** Anthropic's documentation is explicit that on an unmanaged device a user does not need administrator rights to bypass them. Deployment through MDM to a managed device is what makes them hold.
 

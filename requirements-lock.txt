@@ -1,0 +1,4 @@
+# Pin file for python-docx converter. Regenerate with:
+#   pip install pip-tools
+#   pip-compile --generate-hashes requirements.txt -o requirements-lock.txt
+python-docx==1.2.0

@@ -18,6 +18,61 @@ CLAUSE = re.compile(r"^(\d+\.\d+)\t(.*)$", re.S)
 SUBCLAUSE = re.compile(r"^(\([a-z]+\))\t(.*)$", re.S)
 
 
+def check_docx_features(doc):
+    """Warn (never fail) about content the converter is known to drop silently.
+
+    Tracked changes, footnotes and text boxes can all carry legally
+    significant text that `body_items`/`render_paragraph` never visit, so a
+    clean run of this script is not proof the .md is a complete rendering of
+    the .docx. This only prints warnings to stderr; it does not raise.
+    """
+    body = doc.element.body
+
+    # 1. Tracked changes: <w:ins>/<w:del> wrap accepted/rejected edits that
+    # python-docx's own paragraph iteration skips over entirely.
+    revisions = body.xpath(".//w:ins | .//w:del")
+    if revisions:
+        print(
+            f"WARNING: docx-to-md: tracked changes detected ({len(revisions)} "
+            "insertion/deletion element(s)) - accepted and rejected edits are "
+            "not distinguished, and their text may be silently included or "
+            "dropped in the rendered Markdown",
+            file=sys.stderr,
+        )
+
+    # 2. Footnotes: not exposed by python-docx's Document API at all, so they
+    # have to be found via the footnotes part relationship directly.
+    footnote_count = 0
+    try:
+        for rel in doc.part.rels.values():
+            if rel.is_external or not rel.reltype.endswith("/footnotes"):
+                continue
+            footnotes = rel.target_part.element.xpath(
+                ".//w:footnote["
+                "not(@w:type='separator') and "
+                "not(@w:type='continuationSeparator')"
+                "]"
+            )
+            footnote_count += len(footnotes)
+    except Exception:
+        pass
+    if footnote_count:
+        print(
+            f"WARNING: docx-to-md: {footnote_count} footnote(s) detected - "
+            "footnote text is not rendered in the Markdown output",
+            file=sys.stderr,
+        )
+
+    # 3. Text boxes: content inside <w:txbxContent> is not walked by
+    # body_items, so it never reaches render_paragraph/render_table.
+    if "txbxContent" in body.xml:
+        print(
+            "WARNING: docx-to-md: text box(es) detected - text box content "
+            "is not rendered in the Markdown output",
+            file=sys.stderr,
+        )
+
+
 def style_of(p):
     try:
         return p.style.name if p.style is not None else ""
@@ -75,6 +130,7 @@ def render_paragraph(p):
 def main():
     src, dst = sys.argv[1], sys.argv[2]
     document = docx.Document(src)
+    check_docx_features(document)
 
     lines = [
         "<!-- Generated from the .docx by scripts/docx-to-md.py. Do not edit by hand. -->",

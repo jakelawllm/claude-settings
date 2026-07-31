@@ -15,7 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loos
 - Case folding is applied only on Windows. On a case-sensitive filesystem `Smith` and `smith` are now distinct matters.
 - Session state is written atomically to a private directory, `0700` with `0600` files, and validated against a schema before use.
 - Session records are copied to a temporary name and renamed, so an interrupted copy cannot leave a partial file that looks like a complete record.
-- The sandbox is enabled in managed settings with `failIfUnavailable` and `allowUnsandboxedCommands: false`. Native Windows has no sandbox, so Claude Code will refuse to start there rather than run without the boundary.
+- The sandbox is enabled in managed settings with `failIfUnavailable` and `allowUnsandboxedCommands: false`. Native Windows has no sandbox, so the guard runs there in an advisory capacity only: Bash is not contained by the OS boundary, and that qualification must be stated wherever the guard's coverage is described.
 - `allowedMcpServers` ships empty. A `serverName` entry matches a display name, which does not identify a server.
 - `requiredMinimumVersion` raised to `2.1.219`.
 - Matters roots are resolved to their real paths. They were canonicalised lexically while targets were resolved, so on macOS, where `/var` is a symlink to `/private/var`, a root under it matched nothing: no path looked like client material and every cross-matter access was permitted. Found by cross-platform CI on its first run.

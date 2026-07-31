@@ -45,6 +45,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { createHash } = require('crypto');
 
 const WIN = process.platform === 'win32';
 const ARCHIVE_DIR = process.env.CLAUDE_MATTER_ARCHIVE || '_ai-record';
@@ -141,6 +142,10 @@ function canonical(p) {
  */
 function realCanonical(p) {
   if (!p) return '';
+  if (String(p).length > 4096) {
+    // path too long — cannot safely canonicalise
+    return ''; // empty string will not match any root, will be treated as non-client
+  }
   let current = String(p);
   const tail = [];
   for (let i = 0; i < 64; i++) {
@@ -154,7 +159,7 @@ function realCanonical(p) {
       current = parent;
     }
   }
-  return canonical(p);
+  return '';
 }
 
 // --------------------------------------------------------------------------
@@ -204,6 +209,11 @@ function resolveRoots() {
   if (usable.length === 0) {
     return { roots: [], error: 'no configured matters root is reachable from this machine' };
   }
+  const seen = new Set();
+  for (const r of usable) {
+    if (seen.has(r)) return { roots: [], error: 'duplicate configured roots resolve to the same canonical path: ' + r };
+    seen.add(r);
+  }
   if (RECORD_ROOT) usable.push(realCanonical(RECORD_ROOT));
 
   // Longest first: an archive nested inside the matters root must match as the
@@ -215,49 +225,72 @@ function isWithin(child, parent) {
   return child === parent || child.startsWith(parent + '/');
 }
 
-/** The matter a path belongs to, or null if it is not client material. */
+/**
+ * The matter a path belongs to, or null if it is not client material, or the
+ * { type: 'root' } sentinel if it names a configured matters root itself: a
+ * root is not a matter and must not be waved through as one (SEC-03).
+ */
 function matterOf(candidate, roots) {
   const c = realCanonical(candidate);
   if (!c) return null;
   for (const root of roots) {
     if (!isWithin(c, root)) continue;
-    if (c === root) return null; // the root itself is not a matter
+    if (c === root) return { type: 'root' }; // the root itself is not a matter
     const name = c.slice(root.length + 1).split('/')[0];
-    // Identity is the matter name: every configured root is an alias of the
-    // same share, so the same matter reached by any of them compares equal.
+    // Identity is root-qualified (SEC-05): two roots are ordinarily aliases of
+    // the same share, so the same matter reached by any of them still
+    // compares equal, but a matter name that collides across genuinely
+    // distinct roots (e.g. /clients-a/ACME and /clients-b/ACME) does not.
     // `dir` keeps the real location, which identity deliberately discards.
-    return { name, id: 'matter:' + name, dir: root + '/' + name };
+    return { name, id: 'matter:' + root + '/' + name, dir: root + '/' + name };
   }
   return null;
+}
+
+/**
+ * Explicit capability registry (SEC-06): every tool this guard reasons about,
+ * and how. A tool absent from this list is 'unknown' rather than silently
+ * contributing no targets, so a new built-in, plugin or MCP tool cannot reach
+ * client material through a gap in a switch statement.
+ */
+const TOOL_CAPS = {
+  Read: { targets: ['file_path'] },
+  Edit: { targets: ['file_path'] },
+  Write: { targets: ['file_path'] },
+  NotebookEdit: { targets: ['notebook_path', 'file_path'] },
+  Grep: { targets: ['path'] },
+  Glob: { targets: ['path'] },
+  Bash: { type: 'bash' }, // working-directory only; see the note at the head of the file
+  PowerShell: { type: 'deny' }, // SEC-02: always deny
+  SessionStart: { type: 'non-resource' },
+  SessionEnd: { type: 'non-resource' },
+};
+
+/** The registry entry for a tool, or the 'unknown' sentinel if it is not listed. */
+function capsOf(toolName) {
+  return TOOL_CAPS[toolName] || { type: 'unknown' };
 }
 
 /** Every path a tool call would touch. An unknown tool contributes nothing. */
 function targetsOf(toolName, input) {
   if (!input) return [];
-  const pick = (...keys) => keys.map((k) => input[k]).filter((v) => typeof v === 'string');
-  switch (toolName) {
-    case 'Read':
-    case 'Edit':
-    case 'Write':
-      return pick('file_path');
-    case 'NotebookEdit':
-      return pick('notebook_path', 'file_path');
-    case 'Grep':
-    case 'Glob':
-      return pick('path');
-    case 'Bash':
-      return []; // working directory only; see the note at the head of the file
-    default:
-      return [];
-  }
+  const caps = capsOf(toolName);
+  if (!caps.targets) return [];
+  return caps.targets.map((k) => input[k]).filter((v) => typeof v === 'string');
 }
 
 // --------------------------------------------------------------------------
 // State
 // --------------------------------------------------------------------------
 
+/**
+ * The session id is attacker-influenceable input, not a filename (SEC-09): a
+ * stripping sanitiser can still collide two different ids down to the same
+ * name, or be used to probe the state directory. Hashing removes both.
+ */
 function statePath(sessionId) {
-  return path.join(STATE_DIR, `${String(sessionId).replace(/[^\w-]/g, '')}.json`);
+  const h = createHash('sha256').update('matter-guard:' + String(sessionId)).digest('hex');
+  return path.join(STATE_DIR, h + '.json');
 }
 
 /** Private by construction: the state names matters and sessions. */
@@ -332,14 +365,38 @@ function warn(ev, binding, touched) {
 function preToolUse(ev) {
   if (MODE === 'off') return;
 
+  // SEC-06: a tool outside the approved registry is refused in enforce mode
+  // rather than silently passed through as contributing no targets.
+  const caps = capsOf(ev.tool_name);
+  if (caps.type === 'deny') {
+    return deny(
+      'PowerShell and equivalent shell tools are not permitted under the firm matter-separation policy.'
+    );
+  }
+  if (caps.type === 'unknown' && MODE === 'enforce') {
+    return denyFault('unknown tool: ' + ev.tool_name + ' — not in the approved tool registry');
+  }
+
   const { roots, error } = resolveRoots();
   if (error) {
     if (MODE !== 'enforce') return; // nothing to warn about without a boundary
     return denyFault(error);
   }
 
+  // SEC-03: a session launched above the matters root can reach every matter
+  // from its working directory alone, with no matter-qualified path in play.
+  const cwdCanon = realCanonical(ev.cwd);
+  if (cwdCanon && roots.length && roots.every((r) => r !== cwdCanon && isWithin(r, cwdCanon))) {
+    return denyFault('session launched above matters root — launch from inside one matter folder');
+  }
+
   const candidates = [...targetsOf(ev.tool_name, ev.tool_input), ev.cwd];
   const touched = candidates.map((c) => matterOf(c, roots)).filter(Boolean);
+  if (touched.some((t) => t.type === 'root')) {
+    return denyFault(
+      'path equals a configured matters root — sessions must be launched from inside one matter, not at the root level'
+    );
+  }
   if (touched.length === 0) return; // no client material in play
 
   let binding;

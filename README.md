@@ -334,7 +334,7 @@ Configuration cannot answer the underlying questions. Whether the retainer or th
 
 ## Status
 
-Written for Claude Code v2.1.207 and later, July 2026. The settings are tested on macOS and Windows. `hooks/matter-guard.js` requires Node and is tested on Windows; its twenty-two tests pass there.
+Written for the Claude Code version pinned as `requiredMinimumVersion` in `managed-settings.json` and later, July 2026. The settings are tested on macOS and Windows. `hooks/matter-guard.js` requires Node and is tested on Windows; run `node tests/matter-guard.test.js` for the current test count, all of which pass there.
 
 The platform difference matters and is not cosmetic. The Bash sandbox, which is the only boundary the operating system enforces rather than the client, runs on macOS, Linux and WSL2 and not on native Windows. On Windows the matter boundary is the hook alone, and the hook confines Bash by working directory rather than by inspecting commands, so a shell command can still read across matters. A practice running on Windows should know that it holds the weaker of the two positions, and that running Claude Code inside WSL2 obtains the stronger one.
 

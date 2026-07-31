@@ -1,6 +1,8 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
 
+  "_comment": "PERSONAL CONVENIENCE ONLY — not a managed policy substitute. Does not contain the matter hook, sandbox policy, or organisation restriction. Not supported for production confidential-matter use. See managed-settings.json for the managed policy template.",
+
   "env": {
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "DISABLE_FEEDBACK_COMMAND": "1",

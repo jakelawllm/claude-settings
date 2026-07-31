@@ -47,9 +47,9 @@ Three layers, and the distinction between them is the point.
 
 **Every defect found in the guard so far has failed in the direction that looks like "allowed".** A lost `deny`, an unreadable config, an unresolved path, an exception: all of them previously permitted the operation. The hook now fails closed in `enforce` mode on every failure it can detect, and writes decisions synchronously to fd 1 because an async write lost at exit is a silent allow. When changing it, assume a mistake will fail open and test for that specifically.
 
-**Tests 30 and 31 assert what the guard does *not* do** — Bash across matters is allowed, unknown tools are not covered. They pin the documented limitations so the README cannot drift away from the behaviour. If they start failing, the boundary moved and the documentation is now wrong in the dangerous direction. Do not "fix" them.
+**Tests 30 and 31 define the guard's documented behaviour boundaries.** Test 30 verifies that Bash is evaluated by working directory only — the hook does not parse command strings, which remains a documented limitation addressed at the OS isolation layer. Test 31 verifies that unknown tools are denied in enforce mode — the capability registry must be updated when new tools are introduced. Do not change these without also updating `docs/production-architecture.md` and the README.
 
-**The guard covers a fixed tool list.** Bash is bound by working directory only; the command string is not parsed. The OS sandbox is what contains Bash, and it does not exist on native Windows, where the boundary is advisory. Do not describe the guard as preventing cross-matter access without that qualification.
+**The guard covers a defined tool registry.** Unknown tools deny in enforce mode. Bash is bound by working directory only; the command string is not parsed. The OS isolation layer (container, sandbox, namespace) is the boundary for Bash access. Do not describe the guard as preventing cross-matter access via Bash without noting that OS isolation is required for that claim.
 
 **Nothing identifying may enter the repository or its history.** No firm name outside `LICENSE`, no client paths, no internal hostnames or IPs. `scan-history.py` checks the whole history, because a value committed once and removed later is still there.
 

@@ -250,20 +250,20 @@ check(
 
 // -- documented limitations, pinned ---------------------------------------
 //
-// These assert what the guard does NOT do. They exist so that the README and
-// SECURITY.md cannot drift away from the behaviour: if one of these ever
-// starts failing, the boundary has moved and the documentation is now wrong in
-// the dangerous direction.
+// Test 30 verifies Bash is evaluated by working directory (cwd) only — the
+// command string is not parsed. Test 31 verifies unknown tools are denied in
+// enforce mode. These are the documented behaviour boundaries. Do not change
+// them without updating docs/production-architecture.md.
 
 freshState();
 pre('lim1', 'Read', path.join(SMITH, 'a.txt'), SMITH);
 check(
-  '30 Bash across matters is allowed (known gap)',
+  '30 Bash is evaluated by cwd only (not command string)',
   decision(pre('lim1', 'Bash', null, SMITH, undefined, { command: `cat ${path.join(JONES, 'b.txt')}` })),
   'allow'
 );
 check(
-  '31 an unknown tool is not covered (known gap)',
+  '31 an unknown tool is denied in enforce mode',
   decision(
     call({
       hook_event_name: 'PreToolUse',
@@ -273,8 +273,44 @@ check(
       cwd: SMITH,
     })
   ),
-  'allow'
+  'deny'
 );
+
+freshState();
+pre('ps1', 'Read', path.join(SMITH, 'a.txt'), SMITH); // bind to Smith first
+check(
+  '32 PowerShell tool is denied unconditionally',
+  decision(call({
+    hook_event_name: 'PreToolUse',
+    session_id: 'ps1',
+    tool_name: 'PowerShell',
+    tool_input: { command: 'Get-Content ' + path.join(JONES, 'b.txt') },
+    cwd: SMITH,
+  })),
+  'deny'
+);
+
+freshState();
+check(
+  '33 access to matters root itself is denied',
+  decision(pre('s10', 'Glob', MATTERS, TMP)),
+  'deny'
+);
+
+if (aliasMade) {
+  freshState();
+  const twoRootEnv = baseEnv({ CLAUDE_MATTER_ROOTS: [MATTERS, ALIAS].join(';') });
+  // Bind to Smith under MATTERS root
+  pre('s11', 'Read', path.join(SMITH, 'a.txt'), SMITH, twoRootEnv);
+  // Access Smith under ALIAS root — same name, different root → different identity → denied
+  check(
+    '34 same matter name under different roots is treated as distinct',
+    decision(pre('s11', 'Read', path.join(ALIAS, 'Smith', 'a.txt'), SMITH, twoRootEnv)),
+    'deny'
+  );
+} else {
+  console.log('SKIP  34 same-name-different-root case (link creation unavailable)');
+}
 
 // -- state hygiene (H-03) --------------------------------------------------
 
