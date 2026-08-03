@@ -92,10 +92,12 @@ jobs:
       - name: Clause references resolve
         run: python scripts/check-clause-refs.py
 
+      # Template mode: placeholders are intentional and reported as warnings.
+      # Structural faults (missing hooks, invalid mode) still fail the build.
+      # Production mode is a release gate against a rendered, non-committed file
+      # and cannot run here without firm-specific values.
       - name: Preflight validate template
-        run: python3 scripts/preflight-validate.py || true
-        # Expected: warnings only (placeholders are intentional in template)
-        # A failure here means the template has structural errors, not just unfilled placeholders
+        run: python3 scripts/preflight-validate.py --mode template managed-settings.json
 
   secrets:
     name: secret scan

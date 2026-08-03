@@ -188,12 +188,15 @@ Managed settings parse tolerantly, so one bad entry is stripped rather than void
 `claude doctor` validates settings keys. It does not exercise the hook, which is ordinary code and fails in ordinary ways. Run its tests separately:
 
 ```
-node tests/matter-guard.test.js          # the guard, driven directly
-python scripts/check-clause-refs.py      # clause references resolve
-CLAUDE_E2E=1 node tests/e2e.test.js      # optional: real Claude Code sessions
+node tests/matter-guard.test.js                    # the guard, driven directly
+node tests/preflight-validate.test.js              # template vs production preflight
+node tests/render-production-settings.test.js      # production settings renderer
+python3 scripts/check-clause-refs.py               # clause references resolve
+python3 scripts/preflight-validate.py --mode template managed-settings.json
+CLAUDE_E2E=1 node tests/e2e.test.js                # optional: real Claude Code sessions
 ```
 
-The first two must always pass and run in CI. The third is opt-in: it launches `claude -p` against a temporary two-matter tree, so it needs a signed-in installation and spends tokens, and it does not run in CI. It exists because driving the hook directly cannot show that Claude Code actually invokes it, with the payload it really sends, and that a refusal at the hook keeps the other matter's content out of the answer. It asserts on containment of a token from the other matter rather than on the wording of a refusal.
+The unit and preflight suites must always pass and run in CI. The E2E tier is opt-in: it launches `claude -p` against a temporary two-matter tree, so it needs a signed-in installation and spends tokens, and it does not run in CI. It exists because driving the hook directly cannot show that Claude Code actually invokes it, with the payload it really sends, and that a refusal at the hook keeps the other matter's content out of the answer. It asserts on containment of a token from the other matter rather than on the wording of a refusal.
 
 Two cases in the unit suite assert what the guard does **not** do: that a Bash command reaching another matter is allowed, and that an unrecognised tool is not covered. They are there so this README cannot drift away from the behaviour. If either starts failing, the boundary has moved and the documentation is wrong in the direction that matters.
 
@@ -201,7 +204,7 @@ Every case must pass. Two cases are skipped on Windows, where POSIX permission b
 
 ## Production go/no-go checklist
 
-This repository is not production-ready as shipped. It is a beta reference implementation, and a practice adopting it should start from no-go for production unless the items below have been resolved in its own deployment.
+This repository is not production-ready as shipped. It is a beta reference implementation, and a practice adopting it should start from no-go for production unless the items below have been resolved in its own deployment. The maintainer release procedure, rollback path, and do-not-tag-until list live in `docs/release-checklist.md`.
 
 If any red item remains unresolved, the answer is no-go for production. If the red items are cleared but the amber items remain, the most this baseline supports is a limited internal pilot. A production go requires the green conditions to be met and recorded by the practice deploying it.
 

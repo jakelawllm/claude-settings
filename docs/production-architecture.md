@@ -44,6 +44,44 @@ Before starting a Claude Code session for a specific matter:
 | Windows with WSL2 | Linux namespace inside WSL2 | Yes |
 | Native Windows | None | No — advisory only |
 
+## Production-rendered settings
+
+The checked-in `managed-settings.json` is a deployment template. It ships with placeholders, observation-mode defaults, and a sandbox that tolerates its own absence. A production deployment uses a rendered file, not the template:
+
+```bash
+python3 scripts/render-production-settings.py \
+  --firm-name "Example Legal" \
+  --org-uuid 11111111-2222-3333-4444-555555555555 \
+  --matter-roots "/srv/matters;/mnt/matters" \
+  --otel-endpoint "https://collector.example.internal/v1/traces" \
+  --hook-path "/etc/claude-code/hooks/matter-guard.js"
+
+python3 scripts/preflight-validate.py --mode production dist/managed-settings.production.json
+```
+
+The renderer writes a gitignored path by default. Firm-identifying values must never enter the repository or its history. Template preflight and production preflight answer different questions: placeholders are expected in the template and blockers in a rendered production file.
+
+## OS isolation validation
+
+The matter guard is defence in depth, not the primary Bash boundary. Before production use, prove the OS isolation layer on the target platform:
+
+1. Confirm `sandbox.enabled: true` and `sandbox.failIfUnavailable: true` in the rendered settings.
+2. Confirm Claude Code refuses to start when the sandbox is unavailable.
+3. Confirm a Bash command cannot reach another matter from inside a real session.
+4. On Windows, use WSL2. Native Windows has no hard isolation path for confidential Bash use.
+
+Unit tests of the hook cannot prove OS isolation. They prove only that the guard's own path and mode checks still hold.
+
+## Live E2E requirement
+
+Before a release candidate is tagged, run:
+
+```bash
+CLAUDE_E2E=1 node tests/e2e.test.js
+```
+
+This is a manual gate. It needs a signed-in Claude Code installation, spends tokens, and does not run in public CI. Record the output or artefact path in the release notes. The unit suite alone is not enough to claim that Claude Code actually invokes the hook with the payload it sends.
+
 ## Deployment checklist
 
-See README.md Production go/no-go checklist section for the full operational checklist.
+See `README.md` Production go/no-go checklist and `docs/release-checklist.md` for the full operational checklist, rollback path, and do-not-tag-until gates.
