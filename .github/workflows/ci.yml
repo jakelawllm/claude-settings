@@ -37,6 +37,16 @@ jobs:
       - name: Hook syntax
         run: node --check hooks/matter-guard.js
 
+      # Preflight has two modes and they answer different questions. These tests
+      # pin the distinction: a placeholder is expected in the template and is a
+      # blocker in a rendered production file. Without them, a future change that
+      # relaxed production mode would look like a passing build.
+      - name: Preflight validation tests
+        run: node tests/preflight-validate.test.js
+
+      - name: Production settings renderer tests
+        run: node tests/render-production-settings.test.js
+
       # The end-to-end tier launches real Claude Code sessions and needs a
       # signed-in installation, so it cannot run here. It is checked for syntax
       # so a broken file is caught, and run by hand before a release.

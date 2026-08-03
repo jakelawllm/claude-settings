@@ -124,6 +124,39 @@ A skill in that directory is the enterprise level, and it overrides a personal o
 
 Two settings decide how firmly this holds. `allowManagedHooksOnly` is already set, so only managed hooks load and a user cannot disable the guard by editing their own settings. `strictPluginOnlyCustomization` is not set here: it blocks skills, agents, hooks and MCP servers from user and project sources so they can come only from plugins or managed settings, and it accepts an array such as `["skills", "hooks"]` to lock named surfaces rather than all four. Consider it if a practitioner adding their own skills is a concern; leave it off if it is not, because it also stops legitimate local tooling.
 
+## Production-rendered settings workflow
+
+The checked-in `managed-settings.json` is a **deployment template**. It carries `REPLACE-WITH-...` placeholders, runs the guard in observation mode, and tolerates a missing sandbox. Every one of those is correct for a first checkout and wrong for a real matter environment. Do not deploy the template as-is.
+
+A practice deploying this baseline must render its own production settings file. The script `scripts/render-production-settings.py` produces a deployable file with the practice's values and the production hardening:
+
+```bash
+python3 scripts/render-production-settings.py \
+  --firm-name "Example Legal" \
+  --org-uuid 11111111-2222-3333-4444-555555555555 \
+  --matter-roots "/srv/matters;/mnt/matters" \
+  --otel-endpoint "https://collector.example.internal/v1/traces"
+```
+
+Values come from CLI flags or environment variables (`CLAUDE_FIRM_NAME`, `CLAUDE_ORG_UUID`, `CLAUDE_MATTER_ROOTS`, `OTEL_EXPORTER_OTLP_ENDPOINT`, `CLAUDE_HOOK_PATH`), never from a committed file. The script refuses to write output that still contains a placeholder — a half-rendered file looks deployable and silently disables the control it appears to configure.
+
+Output defaults to `dist/managed-settings.production.json`, which is gitignored. Rendered production files contain firm-specific deployment values and must never be committed. See `.gitignore` and `docs/release-checklist.md`.
+
+Then validate the production preconditions:
+
+```bash
+python3 scripts/preflight-validate.py --mode production dist/managed-settings.production.json
+```
+
+The two preflight modes answer different questions:
+
+| Mode | Question | Placeholders |
+|---|---|---|
+| `--mode template` | Is the checked-in template structurally valid? | Expected; reported as warnings |
+| `--mode production` | Is a rendered file safe to deploy? | Blockers |
+
+Template validity is **not** deployment validity. A template that passes is a correct template; it is not a safe deployment. Always run production preflight against a rendered file before deploying.
+
 ## Change these seven things first
 
 `claudeMd` opens with `REPLACE-WITH-YOUR-FIRM-NAME`. Substitute the practice's own name, and read the policy text through before you deploy it. It is one firm's position on scope, evidence, verification and records, and it is enforced as a standing instruction in every session, so it should say what your practice has actually decided rather than what this file happens to say.

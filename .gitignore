@@ -9,3 +9,7 @@ files*.zip
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+# Rendered production settings — carries a practice's real deployment values
+# and must never be committed. See scripts/render-production-settings.py.
+dist/

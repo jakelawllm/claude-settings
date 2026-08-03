@@ -16,7 +16,26 @@ Read this before relying on any part of it.
 
 **The MCP allowlist ships empty.** A `serverName` entry matches a display name chosen by whoever configures the server, so it does not identify one. Use an exact URL or command.
 
+## Production-rendered settings workflow
+
+The checked-in `managed-settings.json` is a deployment template. It carries `REPLACE-WITH-...` placeholders, runs the guard in observation mode, and tolerates a missing sandbox. Do not deploy it as-is.
+
+Render a practice-specific file without committing its values:
+
+```bash
+python3 scripts/render-production-settings.py \
+  --firm-name "Example Legal" \
+  --org-uuid 11111111-2222-3333-4444-555555555555 \
+  --matter-roots "/srv/matters;/mnt/matters" \
+  --otel-endpoint "https://collector.example.internal/v1/traces"
+python3 scripts/preflight-validate.py --mode production dist/managed-settings.production.json
+```
+
+The renderer accepts corresponding environment variables, defaults to the gitignored `dist/managed-settings.production.json`, rewrites the literal hook path when required, and refuses to write an output containing a placeholder. Template preflight and production preflight are deliberately different: template placeholders are warnings; production placeholders, `warn` mode and `failIfUnavailable: false` are blockers. This is an engineering readiness gate, not a compliance certification. See `docs/release-checklist.md` for the manual gates.
+
 ## Reporting a vulnerability
+
+Report privately. Do not open a public issue, and do not include client information, matter names or file paths from a real deployment in a report.
 
 Report privately. Do not open a public issue, and do not include client information, matter names or file paths from a real deployment in a report.
 

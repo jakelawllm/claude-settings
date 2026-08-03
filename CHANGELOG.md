@@ -6,6 +6,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loos
 
 ## Unreleased
 
+### Production readiness remediation (Gates 0–5)
+
+- `scripts/preflight-validate.py` now supports two modes: `--mode template` (placeholders are expected and reported as warnings) and `--mode production` (placeholders and observation-mode defaults are blockers). This resolves the central ambiguity in the production audit: the checked-in template is valid as a template, and wrong as a production deployment.
+- `scripts/render-production-settings.py` gives operators a safe, repeatable way to produce a production settings file without committing firm-identifying values. Inputs come from CLI flags or environment variables; output defaults to the gitignored `dist/managed-settings.production.json`; the script refuses to write output containing `REPLACE-WITH`.
+- `tests/preflight-validate.test.js` and `tests/render-production-settings.test.js` lock the expected behaviour for template vs production validation and the renderer.
+- `.github/workflows/ci.yml` now runs the preflight and renderer test suites, preserving the existing guard tests, JSON validation, policy parity check, clause reference resolution, and history scan.
+- `docs/release-checklist.md` records the engineering evidence that must exist before a practice can make its own go/no-go decision, including automated and manual gates, artefact list, rollback procedure, and the do-not-tag-until checklist.
+- `README.md` and `SECURITY.md` now document the production-rendered settings workflow and the distinction between template and production preflight modes.
+- `.gitignore` now explicitly ignores the `dist/` directory used for rendered production settings.
+- Policy Markdown files regenerated from authoritative DOCX sources; clause references and parity remain clean.
+
 ### Security
 
 - The matter guard now fails closed in enforce mode on every failure it can detect: unreadable input, unusable configuration, unreadable or corrupt state, a state directory that cannot be created privately, and unexpected exceptions. Previously each of these allowed the operation.
