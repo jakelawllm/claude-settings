@@ -33,11 +33,20 @@
  *
  * WHAT THIS DOES NOT REACH. Bash is bound by working directory only; the
  * command string is not parsed, so a shell command can still address another
- * matter directly. The tool list below is fixed, so a new built-in, plugin or
- * MCP tool is outside the boundary until added. Hooks are client-side and
- * constrain the model, not a determined user. On macOS, Linux and WSL2 the Bash
- * sandbox is the boundary the operating system enforces; native Windows has no
- * equivalent, and there the guard is advisory for those routes.
+ * matter directly. The PreToolUse matcher is the wildcard "*", and a tool
+ * absent from the capability registry below is refused in enforce mode rather
+ * than passed through: the failure direction is a refusal, not a gap. The cost
+ * is that the registry must be extended when a new built-in, plugin or MCP
+ * tool is introduced, or that tool stops working until it is classified.
+ * Hooks are client-side and constrain the model, not a determined user.
+ *
+ * The operating system sandbox is what contains a Bash command, and enabling
+ * it is necessary but not sufficient: Claude's sandbox permits reads across
+ * the whole machine unless a per-matter filesystem policy is also configured,
+ * and this repository does not yet generate one. Until it does, no part of
+ * this file or the shipped template should be read as supplying per-matter
+ * Bash isolation. Native Windows has no sandbox equivalent, and there the
+ * guard is advisory for those routes.
  */
 
 'use strict';
@@ -57,12 +66,14 @@ const STATE_DIR =
   path.join(process.env.LOCALAPPDATA || os.homedir() || os.tmpdir(), 'claude-matter-guard');
 const AUDIT_LOG = path.join(STATE_DIR, 'would-have-blocked.log');
 
-/** Emit on fd 1 synchronously: an async write lost at exit is a silent allow. */
+/** Emit on fd 1 synchronously: an async write lost at exit is a silent allow.
+ *  If stdout is unavailable we exit 2 so the PreToolUse contract still blocks. */
 function emit(obj) {
   try {
     fs.writeSync(1, JSON.stringify(obj));
   } catch {
-    /* nothing further can be done; the caller's exit code carries no meaning */
+    /* stdout failed — fall back to blocking exit code per the documented hook contract */
+    try { process.exit(2); } catch { /* best effort */ }
   }
 }
 
@@ -182,15 +193,15 @@ const PLACEHOLDER = /replace-with|your-matters-root|example\.invalid$/i;
  */
 function resolveRoots() {
   const raw = (process.env.CLAUDE_MATTER_ROOTS || '').split(';').map((s) => s.trim()).filter(Boolean);
-  if (raw.length === 0) return { roots: [], error: 'CLAUDE_MATTER_ROOTS is not set' };
+  if (raw.length === 0) return { matterRoots: [], recordRoots: [], error: 'CLAUDE_MATTER_ROOTS is not set' };
 
   const placeholders = raw.filter((r) => PLACEHOLDER.test(r) && !fs.existsSync(r));
   if (placeholders.length) {
-    return { roots: [], error: 'CLAUDE_MATTER_ROOTS still contains the shipped placeholder' };
+    return { matterRoots: [], recordRoots: [], error: 'CLAUDE_MATTER_ROOTS still contains the shipped placeholder' };
   }
   const relative = raw.filter((r) => !isAbsolutePath(r));
   if (relative.length) {
-    return { roots: [], error: `CLAUDE_MATTER_ROOTS contains a relative path: ${relative[0]}` };
+    return { matterRoots: [], recordRoots: [], error: `CLAUDE_MATTER_ROOTS contains a relative path: ${relative[0]}` };
   }
 
   const present = raw.filter((r) => {
@@ -200,35 +211,29 @@ function resolveRoots() {
       return false;
     }
   });
-  // Resolved to real paths, not canonicalised lexically. Targets are resolved
-  // (a symlink out of a matter must be caught), so a root that is not would
-  // never match one: on macOS /var is a symlink to /private/var, and a matters
-  // root under it compared unequal to every path inside it. Nothing looked
-  // like client material and the guard permitted everything.
   const usable = present.map(realCanonical).filter(Boolean);
   if (usable.length === 0) {
-    return { roots: [], error: 'no configured matters root is reachable from this machine' };
+    return { matterRoots: [], recordRoots: [], error: 'no configured matters root is reachable from this machine' };
   }
-  // Deduplicate: multiple configured roots that resolve to the same canonical
-  // path are one root under different aliases (IP form, hostname form, a
-  // mapped drive letter) — collapsing them is the whole point of allowing
-  // more than one entry in CLAUDE_MATTER_ROOTS, so this is silent, not fatal.
-  // Two configured roots that are genuinely distinct locations are still kept
-  // separate, and the root-qualified matter identity below (SEC-05) prevents
-  // a same-named matter under two distinct roots from being treated as one.
   const seenRoots = new Set();
   const deduped = usable.filter((r) => {
     if (seenRoots.has(r)) return false;
     seenRoots.add(r);
     return true;
   });
-  usable.length = 0;
-  deduped.forEach((r) => usable.push(r));
-  if (RECORD_ROOT) usable.push(realCanonical(RECORD_ROOT));
+
+  // Separate matter roots from record root
+  const recordRootCanon = RECORD_ROOT ? realCanonical(RECORD_ROOT) : null;
+  const matterRoots = deduped.filter(r => r !== recordRootCanon);
+
+  if (matterRoots.length === 0) {
+    return { matterRoots: [], recordRoots: [], error: 'no matter roots available after excluding record root' };
+  }
 
   // Longest first: an archive nested inside the matters root must match as the
   // archive, not be read as a matter named after its own folder.
-  return { roots: usable.sort((a, b) => b.length - a.length), error: null };
+  const recordRoots = recordRootCanon ? [recordRootCanon] : [];
+  return { matterRoots: matterRoots.sort((a, b) => b.length - a.length), recordRoots, error: null };
 }
 
 function isWithin(child, parent) {
@@ -240,20 +245,26 @@ function isWithin(child, parent) {
  * { type: 'root' } sentinel if it names a configured matters root itself: a
  * root is not a matter and must not be waved through as one (SEC-03).
  */
-function matterOf(candidate, roots) {
+function matterOf(candidate, matterRoots, recordRoots) {
   const c = realCanonical(candidate);
   if (!c) return null;
-  for (const root of roots) {
+
+  // First check record roots
+  for (const root of recordRoots) {
     if (!isWithin(c, root)) continue;
-    if (c === root) return { type: 'root' }; // the root itself is not a matter
+    if (c === root) return { type: 'record-root' };
     const name = c.slice(root.length + 1).split('/')[0];
-    // Identity is root-qualified (SEC-05): two roots are ordinarily aliases of
-    // the same share, so the same matter reached by any of them still
-    // compares equal, but a matter name that collides across genuinely
-    // distinct roots (e.g. /clients-a/ACME and /clients-b/ACME) does not.
-    // `dir` keeps the real location, which identity deliberately discards.
+    return { name, id: 'record:' + root + '/' + name, dir: root + '/' + name };
+  }
+
+  // Then check matter roots
+  for (const root of matterRoots) {
+    if (!isWithin(c, root)) continue;
+    if (c === root) return { type: 'root' };
+    const name = c.slice(root.length + 1).split('/')[0];
     return { name, id: 'matter:' + root + '/' + name, dir: root + '/' + name };
   }
+
   return null;
 }
 
@@ -264,16 +275,32 @@ function matterOf(candidate, roots) {
  * client material through a gap in a switch statement.
  */
 const TOOL_CAPS = {
+  // Filesystem tools
   Read: { targets: ['file_path'] },
   Edit: { targets: ['file_path'] },
   Write: { targets: ['file_path'] },
+  MultiEdit: { targets: ['file_path'] },
   NotebookEdit: { targets: ['notebook_path', 'file_path'] },
   Grep: { targets: ['path'] },
   Glob: { targets: ['path'] },
+  // Process tools
   Bash: { type: 'bash' }, // working-directory only; see the note at the head of the file
   PowerShell: { type: 'deny' }, // SEC-02: always deny
+  // Network/transmission tools
+  WebFetch: { targets: ['url'] },
+  WebSearch: { targets: ['query'] },
+  // Orchestration tools — non-resource so they cannot leak file paths into a tool call
+  Skill: { type: 'non-resource' },
+  AskUserQuestion: { type: 'non-resource' },
+  Agent: { type: 'non-resource' },
+  TaskCreate: { type: 'non-resource' },
+  TaskUpdate: { type: 'non-resource' },
+  Monitor: { type: 'non-resource' },
+  LSP: { type: 'non-resource' },
+  // Lifecycle
   SessionStart: { type: 'non-resource' },
   SessionEnd: { type: 'non-resource' },
+  Notification: { type: 'non-resource' },
 };
 
 /** The registry entry for a tool, or the 'unknown' sentinel if it is not listed. */
@@ -328,19 +355,34 @@ function readBinding(sessionId) {
   return b;
 }
 
-/** Written to a temporary name and renamed, so a torn write is never read. */
+/**
+ * Written atomically using exclusive create on the target path. This is the
+ * SEC-03 fix: the prior read–decide–rename sequence was racy because two hook
+ * processes could both observe no binding, both decide on a matter, and both
+ * overwrite each other via renameSync. openSync with 'wx' refuses to clobber
+ * an existing binding file; on EEXIST we reread and return the winner so the
+ * caller can compare and deny a mismatch.
+ */
 function writeBinding(sessionId, binding) {
   ensureStateDir();
   const target = statePath(sessionId);
-  const tmp = `${target}.${process.pid}.tmp`;
-  const fd = fs.openSync(tmp, 'w', 0o600);
+  let fd;
+  try {
+    fd = fs.openSync(target, 'wx', 0o600);
+  } catch (err) {
+    if (err && err.code === 'EEXIST') {
+      // Another process won the race. Reread so the caller can compare.
+      return readBinding(sessionId);
+    }
+    throw err;
+  }
   try {
     fs.writeSync(fd, JSON.stringify(binding));
     fs.fsyncSync(fd);
   } finally {
     fs.closeSync(fd);
   }
-  fs.renameSync(tmp, target);
+  return binding;
 }
 
 // --------------------------------------------------------------------------
@@ -387,21 +429,23 @@ function preToolUse(ev) {
     return denyFault('unknown tool: ' + ev.tool_name + ' — not in the approved tool registry');
   }
 
-  const { roots, error } = resolveRoots();
+  const { matterRoots, recordRoots, error } = resolveRoots();
   if (error) {
     if (MODE !== 'enforce') return; // nothing to warn about without a boundary
     return denyFault(error);
   }
 
-  // SEC-03: a session launched above the matters root can reach every matter
+  // SEC-03: a session launched above any matters root can reach every matter
   // from its working directory alone, with no matter-qualified path in play.
+  // Use some(): if cwd IS a matter root OR contains any matter root, deny.
+  // Record roots are excluded from this check (they are not matters).
   const cwdCanon = realCanonical(ev.cwd);
-  if (cwdCanon && roots.length && roots.every((r) => r !== cwdCanon && isWithin(r, cwdCanon))) {
+  if (cwdCanon && matterRoots.length && matterRoots.some((r) => r === cwdCanon || isWithin(r, cwdCanon))) {
     return denyFault('session launched above matters root — launch from inside one matter folder');
   }
 
   const candidates = [...targetsOf(ev.tool_name, ev.tool_input), ev.cwd];
-  const touched = candidates.map((c) => matterOf(c, roots)).filter(Boolean);
+  const touched = candidates.map((c) => matterOf(c, matterRoots, recordRoots)).filter(Boolean);
   if (touched.some((t) => t.type === 'root')) {
     return denyFault(
       'path equals a configured matters root — sessions must be launched from inside one matter, not at the root level'
@@ -417,20 +461,58 @@ function preToolUse(ev) {
     return denyFault(`the session's matter binding could not be read: ${err.message}`);
   }
 
-  for (const t of touched) {
-    if (!binding) {
-      binding = { id: t.id, name: t.name, dir: t.dir };
-      try {
-        writeBinding(ev.session_id, binding);
-      } catch (err) {
-        if (MODE !== 'enforce') return;
-        // Without durable state the next call rebinds, and the session can
-        // move between matters one call at a time.
-        return denyFault(`the session's matter binding could not be saved: ${err.message}`);
-      }
-      continue;
+  // SEC-07: validate the complete candidate set before committing any binding.
+  // Never write state for a call that will be denied.
+  const matterTouches = touched.filter((t) => t.type !== 'record-root' && t.type !== 'root');
+  if (matterTouches.length === 0) {
+    // Only record-root material is in play. Without a prior binding there is
+    // nothing to bind to; with a binding, record access is allowed only if the
+    // archive identity matches (handled below via id comparison when present).
+    if (!binding) return;
+  }
+
+  // Distinct matter identities in one call: refuse without writing a binding.
+  const distinctIds = [...new Set(matterTouches.map((t) => t.id))];
+  if (distinctIds.length > 1) {
+    if (MODE === 'warn') {
+      return warn(ev, binding || matterTouches[0], matterTouches[1]);
     }
-    if (t.id !== binding.id) {
+    return deny(
+      `Blocked by the firm's matter-separation policy. This call touches more ` +
+        `than one matter (${matterTouches.map((t) => t.name).join(', ')}). ` +
+        `Close this session and start a new one in a single matter folder.`
+    );
+  }
+
+  const candidateMatter = matterTouches[0] || null;
+
+  if (!binding && candidateMatter) {
+    try {
+      const result = writeBinding(ev.session_id, {
+        id: candidateMatter.id,
+        name: candidateMatter.name,
+        dir: candidateMatter.dir,
+      });
+      // Exclusive-create lost the race: compare the winner before allowing.
+      if (result && result.id && result.id !== candidateMatter.id) {
+        if (MODE === 'warn') return warn(ev, result, candidateMatter);
+        return deny(
+          `Blocked by the firm's matter-separation policy. This session is ` +
+            `confined to the matter "${result.name}" and the path requested ` +
+            `belongs to "${candidateMatter.name}". Do not retry, and do not ` +
+            `attempt another route to the same file. Close this session and ` +
+            `start a new one in the other matter's folder.`
+        );
+      }
+      binding = result && result.id ? result : candidateMatter;
+    } catch (err) {
+      if (MODE !== 'enforce') return;
+      return denyFault(`the session's matter binding could not be saved: ${err.message}`);
+    }
+  }
+
+  for (const t of matterTouches) {
+    if (binding && t.id !== binding.id) {
       if (MODE === 'warn') return warn(ev, binding, t);
       return deny(
         `Blocked by the firm's matter-separation policy. This session is ` +
@@ -444,12 +526,12 @@ function preToolUse(ev) {
 }
 
 function sessionStart(ev) {
-  const { roots, error } = resolveRoots();
-  const m = error ? null : matterOf(ev.cwd, roots);
+  const { matterRoots, recordRoots, error } = resolveRoots();
+  const m = error ? null : matterOf(ev.cwd, matterRoots, recordRoots);
   const context = error
     ? `The matter separation guard is not usable: ${error}. Client work should ` +
       `not proceed until it is fixed.`
-    : m
+    : m && m.type !== 'record-root'
       ? `This session is confined to the matter "${m.name}". Files belonging to ` +
         `any other matter are blocked and must not be accessed by any route.`
       : `This session did not start in a matter folder. Do not open client ` +
@@ -460,7 +542,7 @@ function sessionStart(ev) {
 
 /** File the transcript. SessionEnd guarantees the transcript is complete. */
 function sessionEnd(ev) {
-  const { roots, error } = resolveRoots();
+  const { matterRoots, recordRoots, error } = resolveRoots();
   if (error || !ev.transcript_path) return;
 
   let binding = null;
@@ -469,8 +551,16 @@ function sessionEnd(ev) {
   } catch {
     binding = null;
   }
-  if (!binding) binding = matterOf(ev.cwd, roots);
-  if (!binding || !binding.dir || !binding.name) return;
+  if (!binding || !binding.dir || !binding.name) {
+    // REC-03: do not silently infer from cwd when the binding is missing or
+    // corrupt. Surface the records gap to the practitioner instead.
+    emit({
+      systemMessage:
+        `Session record could NOT be filed: the session binding is missing or unreadable. ` +
+        `Record the session on the matter file by hand and investigate state integrity.`,
+    });
+    return;
+  }
 
   try {
     if (!fs.existsSync(ev.transcript_path)) return;

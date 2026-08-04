@@ -65,7 +65,7 @@ fs.writeFileSync(
       hooks: {
         PreToolUse: [
           {
-            matcher: 'Read|Edit|Write|NotebookEdit|Grep|Glob|Bash',
+            matcher: '*',
             hooks: [{ type: 'command', command: hookCmd }],
           },
         ],

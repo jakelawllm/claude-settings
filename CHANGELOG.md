@@ -8,6 +8,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loos
 
 ### Security
 
+- Production preflight now distinguishes the shipped template from rendered deployment settings, rejects production placeholders and warn-mode defaults, requires strict sandbox and MCP controls, checks hook wiring, and blocks unresolved governance registers.
+- Release packaging now includes a sandbox-policy-aware manifest whose hashes are generated and verified against the production settings, hook, compliance skill and dependency lock file.
+- Office XML scanning now allowlists only the matched synthetic value, not the whole XML member, so a real secret beside an allowed example value is still reported.
 - The matter guard now fails closed in enforce mode on every failure it can detect: unreadable input, unusable configuration, unreadable or corrupt state, a state directory that cannot be created privately, and unexpected exceptions. Previously each of these allowed the operation.
 - The shipped `CLAUDE_MATTER_ROOTS` placeholder no longer silently disables enforcement. A placeholder, a relative path, or a set of roots none of which resolve is now a refusal rather than a boundary that matches nothing.
 - Paths are resolved to their real location before comparison, so a symlink or junction inside one matter that points into another is refused.
@@ -15,7 +18,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loos
 - Case folding is applied only on Windows. On a case-sensitive filesystem `Smith` and `smith` are now distinct matters.
 - Session state is written atomically to a private directory, `0700` with `0600` files, and validated against a schema before use.
 - Session records are copied to a temporary name and renamed, so an interrupted copy cannot leave a partial file that looks like a complete record.
-- The sandbox is enabled in managed settings with `failIfUnavailable` and `allowUnsandboxedCommands: false`. Native Windows has no sandbox, so the guard runs there in an advisory capacity only: Bash is not contained by the OS boundary, and that qualification must be stated wherever the guard's coverage is described.
+- The sandbox is enabled in managed settings with `allowUnsandboxedCommands: false`; `failIfUnavailable` deliberately remains `false` in the shipped template for observation-period deployments and must be rendered to `true` for production. Native Windows has no sandbox, so the guard runs there in an advisory capacity only: Bash is not contained by the OS boundary, and that qualification must be stated wherever the guard's coverage is described.
 - `allowedMcpServers` ships empty. A `serverName` entry matches a display name, which does not identify a server.
 - `requiredMinimumVersion` raised to `2.1.219`.
 - Matters roots are resolved to their real paths. They were canonicalised lexically while targets were resolved, so on macOS, where `/var` is a symlink to `/private/var`, a root under it matched nothing: no path looked like client material and every cross-matter access was permitted. Found by cross-platform CI on its first run.

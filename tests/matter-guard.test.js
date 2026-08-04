@@ -145,6 +145,95 @@ if (linkMade) {
   console.log('SKIP  12 symlink escape (link creation unavailable)');
 }
 
+// -- ancestor matrix (SEC-04 / design §6.3) ----------------------------------
+// The required property is that a cwd ABOVE ANY protected matter root must be
+// refused, independently of how many other roots or a central record root exist.
+
+{
+  const PARENT = path.join(TMP, 'parent');
+  const ROOT_A = path.join(PARENT, 'root-a');
+  const ROOT_B = path.join(PARENT, 'root-b');
+  const SMITH_A = path.join(ROOT_A, 'Smith');
+  const SMITH_B = path.join(ROOT_B, 'Smith');
+  for (const d of [PARENT, ROOT_A, ROOT_B, SMITH_A, SMITH_B]) fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(SMITH_A, 'a.txt'), 'a');
+  fs.writeFileSync(path.join(SMITH_B, 'a.txt'), 'b');
+
+  const twoRootEnv = baseEnv({ CLAUDE_MATTER_ROOTS: [ROOT_A, ROOT_B].join(';') });
+  const TWO_CENTRAL = path.join(TMP, 'central-record');
+  const centralEnv = baseEnv({ CLAUDE_MATTER_ROOTS: [ROOT_A, ROOT_B].join(';'), CLAUDE_RECORD_ROOT: TWO_CENTRAL });
+
+  // Case 1: cwd equals one matter root -> deny
+  freshState();
+  check('35 cwd equals one matter root is refused', decision(pre('m1', 'Read', path.join(SMITH_A, 'a.txt'), ROOT_A, twoRootEnv)), 'deny');
+  // Case 2: cwd is parent of one of several roots -> deny
+  freshState();
+  check('36 cwd is parent of one of several roots is refused', decision(pre('m2', 'Read', path.join(SMITH_A, 'a.txt'), PARENT, twoRootEnv)), 'deny');
+  // Case 3: cwd is grandparent of one root -> deny
+  freshState();
+  const GRAND = path.join(TMP, 'grand');
+  fs.mkdirSync(GRAND, { recursive: true });
+  const grandEnv = baseEnv({ CLAUDE_MATTER_ROOTS: path.join(GRAND, 'child', 'matters') });
+  fs.mkdirSync(path.join(GRAND, 'child', 'matters', 'Smith'), { recursive: true });
+  fs.writeFileSync(path.join(GRAND, 'child', 'matters', 'Smith', 'a.txt'), 'a');
+  check('37 cwd is grandparent of one root is refused', decision(pre('m3', 'Read', path.join(GRAND, 'child', 'matters', 'Smith', 'a.txt'), GRAND, grandEnv)), 'deny');
+  // Case 4: cwd is parent of root A but not root B -> deny (current every() fails here)
+  freshState();
+  check('38 cwd above one of several roots is refused (every() defect)', decision(pre('m4', 'Read', path.join(SMITH_A, 'a.txt'), path.join(ROOT_A, '..'), twoRootEnv)), 'deny');
+  // Case 5: cwd is inside one matter -> allow
+  freshState();
+  check('39 cwd inside one matter is allowed', decision(pre('m5', 'Read', path.join(SMITH_A, 'a.txt'), SMITH_A, twoRootEnv)), 'allow');
+  // Case 6: cwd is unrelated -> deny (ancestor of the matters root)
+  freshState();
+  check('40 cwd unrelated to any root is denied (ancestor)', decision(pre('m6', 'Read', path.join(SMITH_A, 'a.txt'), TMP, twoRootEnv)), 'deny');
+  // Case 7: record root configured, cwd is parent of a matter root -> deny (record root must not dilute)
+  freshState();
+  check('41 record root must not dilute ancestor refusal', decision(pre('m7', 'Read', path.join(SMITH_A, 'a.txt'), PARENT, centralEnv)), 'deny');
+}
+
+// -- concurrency (TST-01 / SEC-03) -------------------------------------------
+// Two hook processes aimed at different matters, released simultaneously, must
+// produce at most one winner. The first write wins via exclusive create.
+{
+  freshState();
+  const A = SMITH, B = JONES;
+  const aTarget = path.join(A, 'a.txt');
+  const bTarget = path.join(B, 'b.txt');
+  const mkEv = (session, tool, target, cwd) => JSON.stringify({
+    hook_event_name: 'PreToolUse', session_id: session, tool_name: tool,
+    tool_input: { file_path: target }, cwd,
+  });
+  // Same session_id, two different matters: exclusive-create means at most one
+  // binding can win. Sequential is not a full race, but it still proves the
+  // second first-touch cannot rebind after the first exclusive create.
+  const r1 = spawnSync(process.execPath, [HOOK], {
+    input: mkEv('c-race', 'Read', aTarget, A),
+    env: baseEnv(),
+    encoding: 'utf8',
+  });
+  const r2 = spawnSync(process.execPath, [HOOK], {
+    input: mkEv('c-race', 'Read', bTarget, B),
+    env: baseEnv(),
+    encoding: 'utf8',
+  });
+  const d1 = (() => {
+    try {
+      return JSON.parse(r1.stdout).hookSpecificOutput.permissionDecision || 'allow';
+    } catch {
+      return 'allow';
+    }
+  })();
+  const d2 = (() => {
+    try {
+      return JSON.parse(r2.stdout).hookSpecificOutput.permissionDecision || 'allow';
+    } catch {
+      return 'allow';
+    }
+  })();
+  const pattern = d1 === 'allow' && d2 === 'deny' ? 'first-wins' : d1 === 'deny' && d2 === 'allow' ? 'second-wins' : `${d1}+${d2}`;
+  check('42 same-session first-touch binds once (exclusive create)', pattern, 'first-wins');
+}
+
 // -- configuration faults: every one fails closed in enforce ---------------
 
 const PLACEHOLDER = 'REPLACE-WITH-YOUR-MATTERS-ROOT-AND-EVERY-ALIAS-SEMICOLON-SEPARATED';
