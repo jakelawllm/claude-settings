@@ -54,6 +54,9 @@ ALL_PATTERNS = SECRETS + IDENTIFYING + ENTROPY
 
 PATH_ALLOW = [
     re.compile(r"^scripts/scan-history\.py$"),  # this file states the patterns
+    # Test fixtures deliberately state scanner patterns and exercise them;
+    # the scanner must not flag its own negative-test corpus.
+    re.compile(r"^tests/scan-docx-xml\.test\.js$"),
 ]
 
 ALLOW_MATCH = [
