@@ -6,6 +6,12 @@ compass_artifact_*.md
 # Distribution artefact built from the tracked files
 files*.zip
 
+dist/
+
 # Python bytecode cache
 __pycache__/
 *.pyc
+
+# Production-readiness review and planning artefacts
+production-readiness-gates-planning-report.md
+claude-settings-production-readiness-review.md

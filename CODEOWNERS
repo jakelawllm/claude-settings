@@ -1,0 +1,14 @@
+# Control files need review by the repository owner until a practice replaces this
+# with its own named security, records and legal owners.
+
+/managed-settings.json @jacobcd123
+/settings.json @jacobcd123
+/matter-settings.json @jacobcd123
+/hooks/ @jacobcd123
+/skills/ @jacobcd123
+/scripts/ @jacobcd123
+/tests/ @jacobcd123
+/docs/ @jacobcd123
+/.github/workflows/ @jacobcd123
+/requirements*.txt @jacobcd123
+/schemas/ @jacobcd123

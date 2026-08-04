@@ -52,16 +52,61 @@ ENTROPY = [
 
 ALL_PATTERNS = SECRETS + IDENTIFYING + ENTROPY
 
-ALLOW = [
-    re.compile(r"scripts/scan-history\.py"),  # this file states the patterns
-    re.compile(r"example\.invalid"),
-    re.compile(r"nas\.example"),
-    # GitHub Actions pinned commit SHAs appear as `uses: owner/action@<40hexchars>`
-    # and trip the high-entropy check; they are version pins, not secrets.
-    re.compile(r"uses:\s+\S+@[0-9a-f]{40}"),
+PATH_ALLOW = [
+    re.compile(r"^scripts/scan-history\.py$"),  # this file states the patterns
 ]
 
-_HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+ALLOW_MATCH = [
+    re.compile(r"example\.invalid"),
+    re.compile(r"nas\.example"),
+    # Sandbox schema field lists contain long slash-separated identifier runs;
+    # they are documented field names, not unlabelled credentials.
+    re.compile(r"filesystem\.denyRead/allowRead/allowWrite/allowManagedReadPathsOnly"),
+    re.compile(r"network\.allowedDomains/allowManagedDomainsOnly/allowLocalBinding"),
+    # The entropy regex matches prefix-less runs because dots break the class;
+    # these bare runs appear in generate-matter-sandbox.py docstrings.
+    re.compile(r"^denyRead/allowRead/allowWrite/allowManagedReadPathsOnly$"),
+    re.compile(r"^allowedDomains/allowManagedDomainsOnly/allowLocalBinding$"),
+]
+
+HEX64 = re.compile(r"^[0-9a-f]{64}$")
+SHA40 = re.compile(r"^[0-9a-f]{40}$")
+RECORDS_HASH_PLACEHOLDER = re.compile(
+    r"^aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899$"
+)
+_HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d)? \+(\d+)(?:,\d+)? @@")
+
+
+def path_is_allowed(filename):
+    """Return true for files whose own source necessarily states scanner patterns."""
+    return any(a.search(filename) for a in PATH_ALLOW)
+
+
+def match_is_allowed(filename, content, match_text):
+    """Return true only for a matched value that is a known non-secret.
+
+    Do not allowlist a whole line because it contains a harmless example. A
+    real credential can sit beside an allowed value on the same line. Contextual
+    allowances below prove the matched high-entropy value is an integrity digest
+    or documented placeholder, not just that the surrounding line looked safe.
+    """
+    if any(a.search(match_text) for a in ALLOW_MATCH):
+        return True
+    if SHA40.fullmatch(match_text) and re.search(
+        r"uses:\s+\S+@" + re.escape(match_text) + r"\b", content
+    ):
+        return True
+    if HEX64.fullmatch(match_text):
+        if re.search(r"--hash=sha256:" + re.escape(match_text) + r"\b", content):
+            return True
+        if RECORDS_HASH_PLACEHOLDER.fullmatch(match_text):
+            return True
+        if (
+            filename == "schemas/claude-code-settings.schema.json.sha256"
+            and content.strip().startswith(match_text)
+        ):
+            return True
+    return False
 
 
 def iter_added_lines(diff_text):
@@ -106,10 +151,12 @@ def scan_diff():
     hits = []
     for filename, lineno, content in iter_added_lines(diff):
         location = f"{filename}:{lineno}"
-        if any(a.search(filename) or a.search(content) for a in ALLOW):
+        if path_is_allowed(filename):
             continue
         for label, pattern in ALL_PATTERNS:
-            if re.search(pattern, content):
+            for match in re.finditer(pattern, content):
+                if match_is_allowed(filename, content, match.group(0)):
+                    continue
                 hits.append((label, location))
     return hits
 
@@ -117,7 +164,7 @@ def scan_diff():
 def scan_commit_messages():
     """Scan commit subjects and bodies, not just diff content.
 
-    Uses unit-separator (\\x1f) and record-separator (\\x1e) delimiters so a
+    Uses unit-separator (\x1f) and record-separator (\x1e) delimiters so a
     multi-line body can't be confused with the next commit's hash, and so the
     hash itself (40 hex chars, which would otherwise trip the entropy check)
     is never part of the scanned text.
@@ -142,10 +189,10 @@ def scan_commit_messages():
         short = commit_hash[:12] if commit_hash else "unknown"
         location = f"commit {short}"
         for text_line in message.splitlines():
-            if any(a.search(text_line) for a in ALLOW):
-                continue
             for label, pattern in ALL_PATTERNS:
-                if re.search(pattern, text_line):
+                for match in re.finditer(pattern, text_line):
+                    if match_is_allowed("", text_line, match.group(0)):
+                        continue
                     hits.append((label, location))
     return hits
 
@@ -165,7 +212,7 @@ def main() -> int:
         print(f"{len(hits)} potential disclosure(s) in history:")
         for label, location in hits[:40]:
             print(f"FOUND: {location}: {label} [REDACTED]")
-        print("\nA hit that is a false positive belongs in ALLOW with a reason.")
+        print("\nA hit that is a false positive belongs in ALLOW_MATCH with a reason.")
         print("A hit that is real cannot be fixed by deleting the file: the")
         print("history must be rewritten before the repository is made public.")
         return 1

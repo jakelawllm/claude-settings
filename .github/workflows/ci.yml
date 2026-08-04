@@ -62,13 +62,21 @@ jobs:
             python -c "import json,sys; json.load(open(sys.argv[1])); print(sys.argv[1], 'ok')" "$f"
           done
 
+      - name: Install locked Python dependencies
+        run: pip install --require-hashes -r requirements-lock.txt
+
       - name: Validate settings schema
         run: |
-          pip install check-jsonschema --quiet
-          check-jsonschema --schemafile https://json.schemastore.org/claude-code-settings.json managed-settings.json settings.json matter-settings.json
-
-      - name: Install converter dependencies
-        run: pip install -r requirements.txt
+          python3 - <<'PY'
+          import hashlib, pathlib, sys
+          schema = pathlib.Path('schemas/claude-code-settings.schema.json')
+          expected = pathlib.Path('schemas/claude-code-settings.schema.json.sha256').read_text(encoding='utf-8').split()[0]
+          actual = hashlib.sha256(schema.read_bytes()).hexdigest()
+          if actual != expected:
+              print(f'schema hash mismatch: expected {expected}, got {actual}')
+              sys.exit(1)
+          PY
+          check-jsonschema --schemafile schemas/claude-code-settings.schema.json managed-settings.json settings.json matter-settings.json
 
       # The Markdown policy is generated. If it has drifted from the DOCX, the
       # repository is publishing something the authoritative document does not
@@ -86,9 +94,48 @@ jobs:
         run: python scripts/check-clause-refs.py
 
       - name: Preflight validate template
-        run: python3 scripts/preflight-validate.py || true
+        run: python3 scripts/preflight-validate.py --mode template managed-settings.json
         # Expected: warnings only (placeholders are intentional in template)
         # A failure here means the template has structural errors, not just unfilled placeholders
+
+      - name: Preflight mutation tests
+        run: node tests/preflight-validate.test.js
+        # Includes production fixture mutation cases for invalid roots, missing hooks,
+        # false sandbox gate and malformed UUIDs.
+
+      - name: Sandbox policy generator tests
+        run: node tests/generate-matter-sandbox.test.js
+
+      - name: Production settings renderer tests
+        run: node tests/render-production-settings.test.js
+
+      - name: Release manifest tests
+        run: node tests/generate-release-manifest.test.js
+
+      - name: Compliance skill evaluation pack
+        run: node tests/compliance-evaluation.test.js
+
+      - name: Records schema contract tests
+        run: node tests/records-schema.test.js
+
+      - name: Preflight validate synthetic production fixture
+        run: python3 scripts/preflight-validate.py --mode production test-fixtures/synthetic-production.json
+        # Expected: PASS. The synthetic fixture is a fully populated production settings
+        # file that must pass production preflight. If it fails, the preflight script
+        # or the fixture itself is broken.
+
+      - name: Generate release manifest (dry run)
+        run: |
+          mkdir -p dist
+          python3 scripts/generate-release-manifest.py \
+            --output dist/release-manifest.json \
+            --production-settings test-fixtures/synthetic-production.json \
+            --sandbox-policy test-fixtures/synthetic-sandbox-policy.json
+          python3 scripts/generate-release-manifest.py \
+            --verify \
+            --output dist/release-manifest.json \
+            --production-settings test-fixtures/synthetic-production.json \
+            --sandbox-policy test-fixtures/synthetic-sandbox-policy.json
 
   secrets:
     name: secret scan
@@ -103,4 +150,10 @@ jobs:
       # scan of the same history; GitHub secret scanning and push protection
       # should be enabled as well before the repository is made public.
       - name: Scan full history
-        run: python scripts/scan-history.py
+        run: python3 scripts/scan-history.py
+
+      - name: Scan Office XML
+        run: python3 scripts/scan-docx-xml.py
+
+      - name: Office XML scanner tests
+        run: node tests/scan-docx-xml.test.js

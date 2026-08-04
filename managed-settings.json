@@ -18,6 +18,7 @@
   "feedbackSurveyRate": 0,
   "autoUpdatesChannel": "stable",
   "requiredMinimumVersion": "2.1.219",
+  "requiredMaximumVersion": "2.1.300",
   "forceLoginMethod": "claudeai",
   "forceLoginOrgUUID": "REPLACE-WITH-YOUR-FIRM-CLAUDE-ORG-UUID",
   "forceRemoteSettingsRefresh": true,

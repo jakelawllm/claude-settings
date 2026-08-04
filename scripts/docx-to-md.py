@@ -14,63 +14,80 @@ import docx
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
-CLAUSE = re.compile(r"^(\d+\.\d+)\t(.*)$", re.S)
-SUBCLAUSE = re.compile(r"^(\([a-z]+\))\t(.*)$", re.S)
+CLAUSE = re.compile(r"^(\d+\.\d+)\t(.*)$", re.DOTALL)
+SUBCLAUSE = re.compile(r"^(\([a-z]+\))\t(.*)$", re.DOTALL)
 
 
 def check_docx_features(doc):
-    """Warn (never fail) about content the converter is known to drop silently.
+    """Fail on unsupported legally significant DOCX features.
 
-    Tracked changes, footnotes and text boxes can all carry legally
-    significant text that `body_items`/`render_paragraph` never visit, so a
-    clean run of this script is not proof the .md is a complete rendering of
-    the .docx. This only prints warnings to stderr; it does not raise.
+    The Markdown is treated as a faithful rendering of the authoritative .docx.
+    If the .docx contains content that this converter cannot render, continuing
+    would publish an incomplete policy. The operator must resolve those features
+    in Word or LibreOffice before conversion.
     """
     body = doc.element.body
+    blockers = []
 
-    # 1. Tracked changes: <w:ins>/<w:del> wrap accepted/rejected edits that
-    # python-docx's own paragraph iteration skips over entirely.
     revisions = body.xpath(".//w:ins | .//w:del")
     if revisions:
-        print(
-            f"WARNING: docx-to-md: tracked changes detected ({len(revisions)} "
-            "insertion/deletion element(s)) - accepted and rejected edits are "
-            "not distinguished, and their text may be silently included or "
-            "dropped in the rendered Markdown",
-            file=sys.stderr,
+        blockers.append(
+            f"tracked changes detected ({len(revisions)} insertion/deletion element(s)); "
+            "accept or reject all changes before conversion"
         )
 
-    # 2. Footnotes: not exposed by python-docx's Document API at all, so they
-    # have to be found via the footnotes part relationship directly.
-    footnote_count = 0
-    try:
-        for rel in doc.part.rels.values():
-            if rel.is_external or not rel.reltype.endswith("/footnotes"):
-                continue
-            footnotes = rel.target_part.element.xpath(
-                ".//w:footnote["
-                "not(@w:type='separator') and "
-                "not(@w:type='continuationSeparator')"
-                "]"
-            )
-            footnote_count += len(footnotes)
-    except Exception:
-        pass
-    if footnote_count:
-        print(
-            f"WARNING: docx-to-md: {footnote_count} footnote(s) detected - "
-            "footnote text is not rendered in the Markdown output",
-            file=sys.stderr,
+    comments = body.xpath(".//w:commentRangeStart | .//w:commentRangeEnd | .//w:commentReference")
+    if comments:
+        blockers.append(
+            f"comments detected ({len(comments)} marker(s)); resolve or delete comments before conversion"
         )
 
-    # 3. Text boxes: content inside <w:txbxContent> is not walked by
-    # body_items, so it never reaches render_paragraph/render_table.
     if "txbxContent" in body.xml:
-        print(
-            "WARNING: docx-to-md: text box(es) detected - text box content "
-            "is not rendered in the Markdown output",
-            file=sys.stderr,
+        blockers.append("text boxes detected; move text box content into the document body")
+
+    if body.xpath(".//w:fldSimple | .//w:fldChar | .//w:instrText"):
+        blockers.append("fields or cross-references detected; update and convert them to static text")
+
+    rels = list(doc.part.rels.values())
+    header_text = []
+    footer_text = []
+    for section in doc.sections:
+        for part in (section.header, section.first_page_header, section.even_page_header):
+            header_text.extend(p.text.strip() for p in part.paragraphs if p.text.strip())
+        for part in (section.footer, section.first_page_footer, section.even_page_footer):
+            footer_text.extend(p.text.strip() for p in part.paragraphs if p.text.strip())
+    allowed_footer = re.compile(
+        r"^(Policy on the Use of Artificial Intelligence in Legal Practice|"
+        r"Protocol on the Use of Artificial Intelligence in Barristers' Practice)"
+        r"\s+\|\s+Version 1\.0\s+\|\s+Page\s+of$"
+    )
+    disallowed_headers = [t for t in header_text if t]
+    disallowed_footers = [t for t in footer_text if not allowed_footer.match(t)]
+    if disallowed_headers or disallowed_footers:
+        blockers.append(
+            f"substantive headers/footers detected ({len(disallowed_headers)} header item(s), "
+            f"{len(disallowed_footers)} footer item(s)); move legally significant content into the body"
         )
+
+    footnote_count = 0
+    endnote_count = 0
+    for rel in rels:
+        if rel.is_external:
+            continue
+        if rel.reltype.endswith("/footnotes"):
+            xml = rel.target_part.blob.decode("utf-8", errors="replace")
+            footnote_count += len(re.findall(r"<w:footnote\b(?![^>]*w:type=)", xml))
+        if rel.reltype.endswith("/endnotes"):
+            xml = rel.target_part.blob.decode("utf-8", errors="replace")
+            endnote_count += len(re.findall(r"<w:endnote\b(?![^>]*w:type=)", xml))
+    if footnote_count:
+        blockers.append(f"footnotes detected ({footnote_count}); move footnote text into the body")
+    if endnote_count:
+        blockers.append(f"endnotes detected ({endnote_count}); move endnote text into the body")
+
+    if blockers:
+        joined = "; ".join(blockers)
+        raise ValueError(f"unsupported DOCX feature(s): {joined}")
 
 
 def style_of(p):
@@ -130,7 +147,11 @@ def render_paragraph(p):
 def main():
     src, dst = sys.argv[1], sys.argv[2]
     document = docx.Document(src)
-    check_docx_features(document)
+    try:
+        check_docx_features(document)
+    except ValueError as exc:
+        print(f"ERROR: docx-to-md: {exc}", file=sys.stderr)
+        return 1
 
     lines = [
         "<!-- Generated from the .docx by scripts/docx-to-md.py. Do not edit by hand. -->",
@@ -164,4 +185,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

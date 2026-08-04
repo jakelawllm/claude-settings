@@ -59,8 +59,10 @@ ok(
 
 ok(
   'README does not claim shipped template gives per-matter Bash isolation',
-  readme.includes('does not yet generate a per-matter sandbox policy') || readme.includes('not yet generate that per-matter policy'),
-  'README keeps the hard-boundary caveat explicit'
+  readme.includes('without a per-matter `sandbox.filesystem` policy') &&
+    readme.includes('Bash is confined by working directory only') &&
+    readme.includes('scripts/generate-matter-sandbox.py'),
+  'README keeps the hard-boundary caveat explicit while acknowledging the generator'
 );
 
 ok(
