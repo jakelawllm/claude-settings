@@ -77,6 +77,11 @@ SHA40 = re.compile(r"^[0-9a-f]{40}$")
 RECORDS_HASH_PLACEHOLDER = re.compile(
     r"^aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899$"
 )
+# GitHub auto-generates this exact commit-message line for the synthetic
+# refs/pull/N/merge ref used by pull_request-triggered CI. Both hex runs are
+# git commit SHAs the platform inserted, not credentials -- and this is the
+# only context in which we accept a bare 40-hex run in a commit message.
+MERGE_COMMIT_LINE = re.compile(r"^Merge [0-9a-f]{40} into [0-9a-f]{40}$")
 _HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d)? \+(\d+)(?:,\d+)? @@")
 
 
@@ -94,6 +99,12 @@ def match_is_allowed(filename, content, match_text):
     or documented placeholder, not just that the surrounding line looked safe.
     """
     if any(a.search(match_text) for a in ALLOW_MATCH):
+        return True
+    # GitHub's synthetic pull_request merge commit messages contain two bare
+    # 40-hex SHAs. Accept only when the whole line is that exact platform form
+    # and the matched text is one of those SHAs -- not any other long hex run
+    # that happens to appear near a "Merge" word.
+    if SHA40.fullmatch(match_text) and MERGE_COMMIT_LINE.fullmatch(content.strip()):
         return True
     if SHA40.fullmatch(match_text) and re.search(
         r"uses:\s+\S+@" + re.escape(match_text) + r"\b", content
