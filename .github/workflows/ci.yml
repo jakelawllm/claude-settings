@@ -37,6 +37,9 @@ jobs:
       - name: Hook syntax
         run: node --check hooks/matter-guard.js
 
+      - name: Documentation control claims
+        run: node tests/docs-control-claims.test.js
+
       # The end-to-end tier launches real Claude Code sessions and needs a
       # signed-in installation, so it cannot run here. It is checked for syntax
       # so a broken file is caught, and run by hand before a release.

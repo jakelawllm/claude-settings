@@ -33,11 +33,20 @@
  *
  * WHAT THIS DOES NOT REACH. Bash is bound by working directory only; the
  * command string is not parsed, so a shell command can still address another
- * matter directly. The tool list below is fixed, so a new built-in, plugin or
- * MCP tool is outside the boundary until added. Hooks are client-side and
- * constrain the model, not a determined user. On macOS, Linux and WSL2 the Bash
- * sandbox is the boundary the operating system enforces; native Windows has no
- * equivalent, and there the guard is advisory for those routes.
+ * matter directly. The PreToolUse matcher is the wildcard "*", and a tool
+ * absent from the capability registry below is refused in enforce mode rather
+ * than passed through: the failure direction is a refusal, not a gap. The cost
+ * is that the registry must be extended when a new built-in, plugin or MCP
+ * tool is introduced, or that tool stops working until it is classified.
+ * Hooks are client-side and constrain the model, not a determined user.
+ *
+ * The operating system sandbox is what contains a Bash command, and enabling
+ * it is necessary but not sufficient: Claude's sandbox permits reads across
+ * the whole machine unless a per-matter filesystem policy is also configured,
+ * and this repository does not yet generate one. Until it does, no part of
+ * this file or the shipped template should be read as supplying per-matter
+ * Bash isolation. Native Windows has no sandbox equivalent, and there the
+ * guard is advisory for those routes.
  */
 
 'use strict';

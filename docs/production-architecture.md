@@ -13,7 +13,9 @@ Each Claude Code session must run inside a process environment that can only see
 - **Linux:** Container, mount namespace, or dedicated OS account per matter
 - **Windows:** WSL2 with a Linux environment — native Windows has no sandbox equivalent and must not be used for confidential Bash use
 
-The OS isolation layer contains Bash and all other shell access. The hook cannot do this — only the OS can.
+That said, enabling the operating system sandbox with `sandbox.enabled: true` is necessary but not sufficient for per-matter isolation. Claude's sandbox permits reads across the whole machine unless a per-matter `sandbox.filesystem` policy is also configured. This repository does not yet ship the generator that emits that policy. Until it does, the baseline contained in `managed-settings.json` is **not** a per-matter Bash containment on its own.
+
+This repository documents the per-matter launcher pattern below as a contract. It does **not** ship a launcher. A practice adopting this configuration must supply its own launcher, container runtime, or namespace setup that creates the isolated filesystem view, verifies the release manifest, sets the working directory to the matter folder, and refuses to start Claude if any preceding step fails. Native Windows is not supported and the launcher must refuse it technically.
 
 ### 2. Matter guard (defence in depth)
 
