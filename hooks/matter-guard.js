@@ -440,7 +440,7 @@ function targetsOf(toolName, toolInput) {
   const out = [];
   for (const key of caps.targets || []) {
     const val = toolInput[key];
-    if (val) out.push(val);
+    if (val != null) out.push(val);
   }
   return out;
 }
