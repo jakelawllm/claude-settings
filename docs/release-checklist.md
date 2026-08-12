@@ -212,15 +212,26 @@ GitHub secret scanning and push protection must also be enabled before any publi
 - [ ] The external records service owner confirms storage, encryption, retention, legal hold, deletion, access logging and alerting are implemented outside this repository.
 - [ ] A synthetic SessionEnd archive success and a monitored failure have both been observed.
 
+## Named release owners
+
+Recorded 2026-08-12 from the repository owner:
+
+| Role | Owner |
+|---|---|
+| Deployment owner | jacobcd123 |
+| Rollback owner | jacobcd123 |
+
+These names close only the ownership-identity item on the tag gate. They do not close expert-report, OAuth, register, data-flow, E2E or OS-isolation gates.
+
 ## Owner-dependent gates
 
 The repository can prepare the evidence framework, but cannot close these gates without a responsible human owner:
 
-- [ ] Expert-report policy decision recorded in `docs/policy-decisions/expert-report-rule.md` and aligned across the DOCX, generated Markdown, managed instruction and compliance skill.
-- [ ] OAuth token management decision recorded in `docs/policy-decisions/oauth-token-management.md`; no long-lived token without approved exception and rotation plan.
-- [ ] Supplier evidence register completed with source URLs, owner names, checked dates and next-review dates.
-- [ ] Legal source register completed against authorised primary sources.
-- [ ] Data-flow model observed and approved by privacy, security and records owners.
+- [ ] Expert-report policy decision recorded in `docs/policy-decisions/expert-report-rule.md` and aligned across the DOCX, generated Markdown, managed instruction and compliance skill. **Still PENDING** — Option B was indicated but no legal/risk owner packet (decided-by, date, rationale) was supplied; leave blank.
+- [ ] OAuth token management decision recorded in `docs/policy-decisions/oauth-token-management.md`; no long-lived token without approved exception and rotation plan. **Still PENDING** — static-token exception indicated then explicitly held pending a complete owner packet.
+- [ ] Supplier evidence register completed with source URLs, owner names, checked dates and next-review dates. **Left blank** per owner instruction 2026-08-12.
+- [ ] Legal source register completed against authorised primary sources. **Left blank** per owner instruction 2026-08-12.
+- [ ] Data-flow model observed and approved by privacy, security and records owners. **Left blank** per owner instruction 2026-08-12.
 
 ## Do not tag until
 
@@ -232,14 +243,14 @@ The repository can prepare the evidence framework, but cannot close these gates 
 - [ ] Template preflight mode passes against `managed-settings.json`.
 - [ ] Production preflight mode passes against the rendered settings file.
 - [ ] Release manifest is generated and verified.
-- [ ] Live E2E has passed on a signed-in Claude Code installation.
+- [ ] Live E2E has passed on a signed-in Claude Code installation. **Blocked on a Windows host** — candidate path `Z:` is not usable on this Linux checkout; re-run on the Windows host with `CLAUDE_MATTER_ROOTS` set to a real matter root.
 - [ ] OS sandbox availability and fail-closed behaviour have been checked in the target environment.
 - [ ] The hook installed path matches the command in the rendered settings file.
 - [ ] Transcript filing has been checked.
 - [ ] Manifest signature verification has been checked.
 - [ ] Independent security review is complete, or a responsible principal has expressly waived it for an internal beta only.
 - [ ] The expert-report mismatch has been resolved or expressly accepted as a documented policy decision by the adopting practice.
-- [ ] The deployment owner and rollback owner are named.
+- [x] The deployment owner and rollback owner are named: **jacobcd123** (both roles).
 - [ ] The version compatibility range has been reviewed and updated.
 
 ## Installation check
