@@ -1,2 +1,2 @@
-check-jsonschema==0.33.3
+check-jsonschema==0.37.4
 python-docx==1.2.0
