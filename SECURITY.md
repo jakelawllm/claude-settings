@@ -37,8 +37,6 @@ The renderer accepts corresponding environment variables, defaults to the gitign
 
 Report privately. Do not open a public issue, and do not include client information, matter names or file paths from a real deployment in a report.
 
-Report privately. Do not open a public issue, and do not include client information, matter names or file paths from a real deployment in a report.
-
 Use GitHub's private vulnerability reporting on this repository, under **Security → Report a vulnerability**.
 
 Please include the affected file and version, what an attacker or a careless user can achieve, the platform and Claude Code version, and a reproduction if you have one. A finding that the guard permits something the documentation says it prevents is in scope, and is the finding most worth having.

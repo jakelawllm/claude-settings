@@ -70,6 +70,16 @@ def has_placeholder(value) -> bool:
     return isinstance(value, str) and PLACEHOLDER in value
 
 
+def is_absolute_path(p: str) -> bool:
+    r"""Cross-platform absolute path test matching the guard's runtime check.
+    
+    Accepts Windows drive letters (C:\), UNC (\\server\share), and POSIX (/).
+    The guard uses /^([a-zA-Z]:[\\/]|\\\\|\/\/|\/)/ which matches all three.
+    """
+    import re
+    return bool(re.match(r'^([a-zA-Z]:[/\\]|\\\\|//|/)', p))
+
+
 def collect_hook_commands(hooks: dict, event: str) -> list:
     """Every command string registered against one hook event."""
     commands = []
@@ -149,6 +159,13 @@ def check_production(settings: dict, errors: list, warnings: list) -> None:
         errors.append("CLAUDE_MATTER_ROOTS is unset: the guard refuses all file access")
     elif has_placeholder(matter_roots):
         errors.append("CLAUDE_MATTER_ROOTS still contains a REPLACE-WITH placeholder")
+    else:
+        # Each semicolon-separated root must be absolute. The guard rejects
+        # relative roots outright, so a file with one is not deployable.
+        for root in matter_roots.split(";"):
+            root = root.strip()
+            if root and not is_absolute_path(root):
+                errors.append(f"CLAUDE_MATTER_ROOTS contains a relative path: {root!r}")
 
     org_uuid = settings.get("forceLoginOrgUUID", "")
     if not org_uuid:
@@ -202,28 +219,29 @@ def check_production(settings: dict, errors: list, warnings: list) -> None:
         if settings.get(key) is not expected:
             errors.append(f"{key} is not {json.dumps(expected)}: {why}")
 
-    # The keys already checked above can legitimately contain a placeholder in
-    # the template. Anything else with `REPLACE-WITH` is a missed replacement.
-    # Skip _template_comment / _telemetry_note / _failIfUnavailable_note which
-    # are inline deployment notes, not real values.
-    placeholder_holders = (
-        "env",
-        "forceLoginOrgUUID",
-        "claudeMd",
-        "sandbox",
-        "permissions",
-        "hooks",
-    )
-    missing = []
-    for key, value in settings.items():
-        if key.startswith("_") or key in placeholder_holders:
-            continue
-        if has_placeholder(value):
-            missing.append(key)
-    if missing:
+    # The keys checked above can have placeholders in the template, and nested
+    # holders were already checked in their specific contexts. Scan the entire
+    # remaining structure for any missed REPLACE-WITH values. Skip inline
+    # deployment notes (_template_comment, _telemetry_note, etc.) only.
+    def find_placeholders(obj, path=""):
+        found = []
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                if key.startswith("_"):
+                    continue
+                found.extend(find_placeholders(value, f"{path}.{key}" if path else key))
+        elif isinstance(obj, list):
+            for i, value in enumerate(obj):
+                found.extend(find_placeholders(value, f"{path}[{i}]"))
+        elif isinstance(obj, str) and PLACEHOLDER in obj:
+            found.append(path or "<root>")
+        return found
+    
+    remaining = find_placeholders(settings)
+    if remaining:
         errors.append(
-            "these top-level keys still contain a REPLACE-WITH placeholder: "
-            + ", ".join(sorted(missing))
+            "these keys still contain a REPLACE-WITH placeholder: "
+            + ", ".join(remaining)
         )
 
 

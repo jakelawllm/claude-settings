@@ -87,6 +87,16 @@ def rewrite_hook_commands(hooks: dict, hook_path: str) -> None:
                     hook["command"] = f'node "{hook_path}"'
 
 
+def is_absolute_path(p: str) -> bool:
+    r"""Cross-platform absolute path test matching the guard's runtime check.
+    
+    Accepts Windows drive letters (C:\), UNC (\\server\share), and POSIX (/).
+    The guard uses /^([a-zA-Z]:[\\/]|\\\\|\/\/|\/)/ which matches all three.
+    """
+    import re
+    return bool(re.match(r'^([a-zA-Z]:[/\\]|\\\\|//|/)', p))
+
+
 def find_remaining_placeholders(obj, path="") -> list:
     """Every location still holding a REPLACE-WITH value, for the error message."""
     found = []
@@ -146,10 +156,12 @@ def render(
 
     # A relative matter root matches nothing and the guard refuses it outright,
     # so catching it here is better than shipping a file that fails closed.
+    # Use the guard's own cross-platform check rather than the render host's
+    # local semantics: a Windows root is absolute even when rendering on Linux.
     if matter_roots:
         for root in matter_roots.split(";"):
             root = root.strip()
-            if root and not pathlib.PurePath(root).is_absolute():
+            if root and not is_absolute_path(root):
                 errors.append(f"matter root is not an absolute path: {root!r}")
 
     if errors:
