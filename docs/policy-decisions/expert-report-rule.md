@@ -2,60 +2,55 @@
 
 ## Status
 
-PENDING — awaiting decision from responsible legal/risk owner.
+APPROVED — Option A (strict prohibition), 2026-08-12.
 
-**Do not close Gate 5 until this file is updated with a decision and the policy files are aligned.**
+The policy DOCX, generated Markdown, managed standing instruction and compliance skill now state the same absolute prohibition: the practice does not use a tool to draft or prepare any part of an expert report, and leave of the court does not cure that ban. An expert's own use of a tool remains a separate question under clause 11.
 
-## The inconsistency
+## The former inconsistency
 
-The repository contains a deliberate mismatch documented in README.md and CLAUDE.md:
+Before this decision the repository contained a deliberate mismatch documented in README.md and CLAUDE.md:
 
-- **Policy clause 7.3** (ai-policy-legal-practice-template.docx): permits expert-report preparation where prior leave is obtained from the responsible practitioner.
-- **claudeMd standing instruction** (managed-settings.json): prohibits drafting or preparing any part of an expert report, without qualification.
-- **Compliance skill** (skills/ai-policy-compliance/SKILL.md): prohibits expert report work outright.
+- **Policy clause 7.3** (ai-policy-legal-practice-template.docx): permitted expert-report preparation where prior leave was obtained.
+- **claudeMd standing instruction** (managed-settings.json): prohibited drafting or preparing any part of an expert report, without qualification.
+- **Compliance skill** (skills/ai-policy-compliance/SKILL.md): prohibited expert report work outright.
 
-## Decision required
+## Decision required (closed)
 
-The responsible legal/risk owner must decide one of:
+The responsible legal/risk owner chose one of:
 
 **Option A — Follow the standing instruction (strict prohibition):**
-Remove the clause 7.3 pathway from the policy document. The tool never assists with expert reports in any circumstance.
+Remove the clause 7.3 leave pathway from the policy document. The tool never assists with expert reports in any circumstance. **← chosen**
 
 **Option B — Follow the policy (leave-gated permission):**
-Update the standing instruction and compliance skill to reflect the clause 7.3 pathway: expert report preparation is permitted only where prior leave has been obtained and recorded on the matter file.
+Update the standing instruction and compliance skill to reflect a leave-gated pathway: expert report preparation permitted only where prior leave has been obtained and recorded on the matter file.
 
-## Files to update once decision is made
+## Files updated
 
-1. ai-policy-legal-practice-template.docx (authoritative) → regenerate .md
-2. managed-settings.json (claudeMd field)
-3. skills/ai-policy-compliance/SKILL.md
+1. `ai-policy-legal-practice-template.docx` (authoritative) — clause 7.3 body rewritten to absolute prohibition; clause number and "expert report" subject preserved for `check-clause-refs.py`.
+2. `ai-policy-legal-practice-template.md` — regenerated via `scripts/docx-to-md.py`.
+3. `managed-settings.json` (`claudeMd` field) — already absolute; no change required.
+4. `skills/ai-policy-compliance/SKILL.md` — already absolute; no change required.
+5. README.md and CLAUDE.md — deliberate-exception language removed / updated to record resolution.
 
 ## Decision record
 
-- **Decision:** [PENDING]
-- **Decided by:** [PENDING]
-- **Date:** [PENDING]
-- **Rationale:** [PENDING]
+- **Decision:** Option A — strict prohibition
+- **Decided by:** jacobcd123
+- **Date:** 2026-08-12
+- **Rationale:** Simplicity and lowest risk for beta.
 
-## Owner packet (fill to close this gate)
+## Owner packet (filled)
 
-Do not edit this section to invent a decision. The legal/risk owner supplies the values below; engineering then applies the matching option.
-
-| Field | Owner supplies |
+| Field | Value |
 |---|---|
-| Chosen option | `A` (strict prohibition) or `B` (leave-gated permission) |
-| Decided by | Named legal/risk owner |
-| Date | ISO date of decision |
-| Rationale | Short written reason on the matter / policy file |
+| Chosen option | `A` (strict prohibition) |
+| Decided by | jacobcd123 |
+| Date | 2026-08-12 |
+| Rationale | Simplicity and lowest risk for beta |
 
-**After Option A is recorded, engineering must:**
-1. Remove the clause 7.3 expert-report pathway from `ai-policy-legal-practice-template.docx` (authoritative) and regenerate the `.md` with `scripts/docx-to-md.py`.
-2. Confirm `managed-settings.json` `claudeMd` and `skills/ai-policy-compliance/SKILL.md` already state the absolute ban (no change if already aligned).
-3. Re-run `python scripts/check-clause-refs.py` and the compliance test suite.
+**After Option A (completed):**
+1. Clause 7.3 leave pathway removed from `ai-policy-legal-practice-template.docx` and Markdown regenerated.
+2. Confirmed `managed-settings.json` `claudeMd` and `skills/ai-policy-compliance/SKILL.md` already state the absolute ban.
+3. Clause-ref and compliance test suite re-run as part of the gate resolution PR.
 
-**After Option B is recorded, engineering must:**
-1. Leave clause 7.3 in the policy DOCX (or adjust only if the leave conditions change).
-2. Update `managed-settings.json` `claudeMd` and `skills/ai-policy-compliance/SKILL.md` to the leave-gated pathway (prior leave on the matter file required).
-3. Re-run clause-ref and compliance tests.
-
-Until the Decision record fields above are non-PENDING, production preflight and the release checklist treat this gate as open.
+Clause 11 (an expert's own use of a tool, leave of the court, and disclosure obligations on the expert) is unchanged. That remains a different question from the practice's prohibition in clause 7.3.

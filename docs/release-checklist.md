@@ -225,13 +225,13 @@ These names close only the ownership-identity item on the tag gate. They do not 
 
 ## Owner-dependent gates
 
-The repository can prepare the evidence framework, but cannot close these gates without a responsible human owner:
+The repository can prepare the evidence framework, but cannot close these gates without a responsible human owner. On 2026-08-12 the responsible principal (**jacobcd123**) resolved or waived each gate for an **internal beta only**. These dispositions do **not** authorise a production go for external or client use.
 
-- [ ] Expert-report policy decision recorded in `docs/policy-decisions/expert-report-rule.md` and aligned across the DOCX, generated Markdown, managed instruction and compliance skill. **Still PENDING** — Option B was indicated but no legal/risk owner packet (decided-by, date, rationale) was supplied; leave blank.
-- [ ] OAuth token management decision recorded in `docs/policy-decisions/oauth-token-management.md`; no long-lived token without approved exception and rotation plan. **Still PENDING** — static-token exception indicated then explicitly held pending a complete owner packet.
-- [ ] Supplier evidence register completed with source URLs, owner names, checked dates and next-review dates. **Left blank** per owner instruction 2026-08-12.
-- [ ] Legal source register completed against authorised primary sources. **Left blank** per owner instruction 2026-08-12.
-- [ ] Data-flow model observed and approved by privacy, security and records owners. **Left blank** per owner instruction 2026-08-12.
+- [x] Expert-report policy decision recorded in `docs/policy-decisions/expert-report-rule.md` and aligned across the DOCX, generated Markdown, managed instruction and compliance skill. **RESOLVED — Option A (strict prohibition), 2026-08-12**, decided by jacobcd123. Rationale: simplicity and lowest risk for beta. Clause 7.3, `claudeMd` and the compliance skill now state the same absolute ban.
+- [ ] OAuth token management decision recorded in `docs/policy-decisions/oauth-token-management.md`; no long-lived token without approved exception and rotation plan. **Option B chosen (static-token exception for internal beta), 2026-08-12**, decided by jacobcd123, after Option A (short-lived identity) proved infeasible without AWS Bedrock / Google Vertex / Microsoft Foundry. **Operational owner-packet fields remain PENDING** (token owner, storage, permissions, rotation dates, revocation, monitoring, migration trigger). SUP-05 exception incomplete; production go still blocked under SUP-05.
+- [ ] Supplier evidence register completed with source URLs, owner names, checked dates and next-review dates. **Waived for internal beta only** by jacobcd123, 2026-08-12. Register cells remain unfilled; not a production go for external/client use.
+- [ ] Legal source register completed against authorised primary sources. **Waived for internal beta only** by jacobcd123, 2026-08-12. Register cells remain unfilled; not a production go for external/client use.
+- [ ] Data-flow model observed and approved by privacy, security and records owners. **Waived for internal beta only** by jacobcd123, 2026-08-12. Sign-off cells remain unfilled; not a production go for external/client use.
 
 ## Do not tag until
 
@@ -243,15 +243,16 @@ The repository can prepare the evidence framework, but cannot close these gates 
 - [ ] Template preflight mode passes against `managed-settings.json`.
 - [ ] Production preflight mode passes against the rendered settings file.
 - [ ] Release manifest is generated and verified.
-- [ ] Live E2E has passed on a signed-in Claude Code installation. **Blocked on a Windows host** — candidate path `Z:` is not usable on this Linux checkout; re-run on the Windows host with `CLAUDE_MATTER_ROOTS` set to a real matter root.
-- [ ] OS sandbox availability and fail-closed behaviour have been checked in the target environment.
+- [ ] Live E2E has passed on a signed-in Claude Code installation. **Blocked on a Windows host** — candidate path `Z:` is not usable on this Linux checkout; re-run on the Windows host with `CLAUDE_MATTER_ROOTS` set to a real matter root. **Waived for internal beta only** by jacobcd123, 2026-08-12 (does not clear the production-go requirement).
+- [ ] OS sandbox availability and fail-closed behaviour have been checked in the target environment. **Waived for internal beta only** by jacobcd123, 2026-08-12 (does not clear the production-go requirement).
 - [ ] The hook installed path matches the command in the rendered settings file.
 - [ ] Transcript filing has been checked.
 - [ ] Manifest signature verification has been checked.
-- [ ] Independent security review is complete, or a responsible principal has expressly waived it for an internal beta only.
-- [ ] The expert-report mismatch has been resolved or expressly accepted as a documented policy decision by the adopting practice.
+- [x] Independent security review is complete, or a responsible principal has expressly waived it for an internal beta only. **Waived for internal beta only** by jacobcd123, 2026-08-12. Not a production go for external/client use.
+- [x] The expert-report mismatch has been resolved or expressly accepted as a documented policy decision by the adopting practice. **Resolved — Option A (strict prohibition), 2026-08-12** (see `docs/policy-decisions/expert-report-rule.md`).
 - [x] The deployment owner and rollback owner are named: **jacobcd123** (both roles).
 - [ ] The version compatibility range has been reviewed and updated.
+- [ ] OAuth SUP-05 exception complete (every Option B operational field non-PENDING) **or** workflow migrated to short-lived identity. See `docs/policy-decisions/oauth-token-management.md`.
 
 ## Installation check
 

@@ -220,7 +220,7 @@ responsible practitioner means the solicitor with day-to-day responsibility for 
 
 **7.2**  Work that is preparatory to the drafting of a witness's evidence is not prohibited by clause 7.1(a). Preparing a chronology, an index, a list of topics or a summary of documents for the solicitor's own use is permitted. The line is that the affidavit or statement must be sworn, affirmed or finalised in a form that reflects the witness's own knowledge and the witness's own words.
 
-**7.3**  A tool must not be used to draft or prepare the content of an expert report, or any part of one, without prior leave of the court where leave is required. See clause 11.
+**7.3**  A tool must not be used to draft or prepare the content of an expert report, or any part of one. This prohibition is absolute and is not cured by leave of the court. See clause 11 for an expert's own use of a tool.
 
 **7.4**  The applications listed in Part D of Schedule 8 must not be used for any work of the practice. An application is placed in Part D where its terms permit inputs to be used for training with no opt-out the practice can enforce, where the data is processed in a jurisdiction the practice cannot accept, where it joins or records a conversation without a positive act by the user, or where its data handling cannot be established at all.
 
