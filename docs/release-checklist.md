@@ -82,6 +82,7 @@ node tests/scan-docx-xml.test.js
 node tests/compliance-evaluation.test.js
 node tests/records-schema.test.js
 node tests/docs-control-claims.test.js
+node tests/scan-history.test.js
 python3 scripts/check-clause-refs.py
 python3 scripts/scan-history.py
 python3 scripts/scan-docx-xml.py

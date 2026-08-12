@@ -152,6 +152,9 @@ jobs:
       - name: Scan full history
         run: python3 scripts/scan-history.py
 
+      - name: History scanner tests
+        run: node tests/scan-history.test.js
+
       - name: Scan Office XML
         run: python3 scripts/scan-docx-xml.py
 
