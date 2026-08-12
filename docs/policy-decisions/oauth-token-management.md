@@ -47,3 +47,29 @@ Keep `CLAUDE_CODE_OAUTH_TOKEN` only if all of the following are recorded:
 - **Last rotated:** PENDING
 - **Next rotation due:** PENDING
 - **Emergency revocation owner:** PENDING
+
+## Owner packet (fill to close this gate)
+
+Do not invent rotation owners, dates, or a migration design. The repository/security owner supplies real values; engineering only implements after that.
+
+| Field | Required for | Owner supplies |
+|---|---|---|
+| Chosen option | A or B | `A` (short-lived identity) or `B` (static-token exception) |
+| Decided by | both | Named security/repository owner |
+| Date | both | ISO date of decision |
+| Rationale | both | Why this option for the current beta |
+| Provider / audience / lifetime / revocation path | **A only** | Identity provider details |
+| Token owner | **B only** | Person accountable for the secret |
+| Storage location | **B only** | e.g. GitHub Actions repository secret name (not the secret value) |
+| Minimum permissions | **B only** | Claude + GitHub scopes actually used |
+| Rotation interval | **B only** | e.g. 90 days |
+| Last rotated / next rotation due | **B only** | ISO dates |
+| Emergency revocation procedure | **B only** | Steps + who executes them |
+| Monitoring owner | **B only** | Who watches for leakage/abuse |
+| Migration trigger | **B only** | Condition that forces move to Option A |
+
+**After Option A is recorded, engineering must:** implement the chosen short-lived identity flow in `.github/workflows/claude.yml`, remove the long-lived secret dependency, and document the provider in this file.
+
+**After Option B is recorded, engineering must:** keep `CLAUDE_CODE_OAUTH_TOKEN` only while every Option B field above is non-PENDING, and schedule the recorded rotation.
+
+Until the Decision record fields above are non-PENDING, no production go is permitted under SUP-05.
