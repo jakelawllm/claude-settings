@@ -289,24 +289,36 @@ function matterOf(candidate, matterRoots, recordRootCanon) {
   const c = realCanonical(candidate);
   if (!c) return null;
 
-  // Check matter roots first
+  // Check record root first: nested archives must win by length.
+  // Paths under RECORD_ROOT/<hash>/<matter>/... belong to that matter.
+  // SessionEnd files to <hash>/<matter>/ where hash is first 16 hex chars of binding.id hash.
+  // For compatibility, also accept <matter>/ (no hash prefix).
+  if (recordRootCanon && isWithin(c, recordRootCanon) && c !== recordRootCanon) {
+    const relative = c.slice(recordRootCanon.length + 1);
+    const segments = relative.split('/');
+    if (segments.length >= 1 && segments[0]) {
+      let name, dir;
+      // Check if first segment is a 16-char hex hash
+      if (segments.length >= 2 && /^[0-9a-f]{16}$/i.test(segments[0])) {
+        // New structure: <hash>/<matter>/...
+        name = segments[1];
+        dir = recordRootCanon + '/' + segments[0] + '/' + name;
+      } else {
+        // Old structure: <matter>/...
+        name = segments[0];
+        dir = recordRootCanon + '/' + name;
+      }
+      const canonicalMatterRoot = matterRoots[0] || recordRootCanon;
+      return { name, id: 'matter:' + canonicalMatterRoot + '/' + name, dir };
+    }
+  }
+
+  // Check matter roots
   for (const root of matterRoots) {
     if (!isWithin(c, root)) continue;
     if (c === root) return { type: 'root' };
     const name = c.slice(root.length + 1).split('/')[0];
     return { name, id: 'matter:' + root + '/' + name, dir: root + '/' + name };
-  }
-
-  // Check record root: paths under RECORD_ROOT/<matter>/... belong to that matter
-  if (recordRootCanon && isWithin(c, recordRootCanon) && c !== recordRootCanon) {
-    const relative = c.slice(recordRootCanon.length + 1);
-    const name = relative.split('/')[0];
-    if (name) {
-      // The matter identity uses the matterRoots[0] as the canonical root for ID purposes
-      // but the dir is the actual archive location
-      const canonicalMatterRoot = matterRoots[0] || recordRootCanon;
-      return { name, id: 'matter:' + canonicalMatterRoot + '/' + name, dir: recordRootCanon + '/' + name };
-    }
   }
 
   return null;
@@ -416,6 +428,21 @@ const TOOL_CAPS = {
 /** The registry entry for a tool, or the 'unknown' sentinel if it is not listed. */
 function capsOf(toolName) {
   return TOOL_CAPS[toolName] || { type: 'unknown' };
+}
+
+/**
+ * Extract path targets from a tool invocation based on the tool's capability.
+ */
+function targetsOf(toolName, toolInput) {
+  const caps = capsOf(toolName);
+  if (caps.type !== 'filesystem') return [];
+  if (!toolInput || typeof toolInput !== 'object') return [];
+  const out = [];
+  for (const key of caps.targets || []) {
+    const val = toolInput[key];
+    if (val) out.push(val);
+  }
+  return out;
 }
 
 /**
@@ -568,7 +595,7 @@ function preToolUse(ev) {
   const caps = capsOf(ev.tool_name);
   if (caps.type === 'deny') {
     return deny(
-      'PowerShell and equivalent shell tools are not permitted under the firm matter-separation policy.'
+      'This tool is not permitted under the firm matter-separation policy.'
     );
   }
   if (caps.type === 'unknown' && MODE === 'enforce') {
