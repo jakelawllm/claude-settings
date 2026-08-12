@@ -89,16 +89,13 @@ def contains_placeholder(value: str) -> str | None:
 def canonicalize_posix(path: str) -> str:
     """Normalise a POSIX path for containment checks.
 
-    Resolves symlinks where the relevant path components exist, and otherwise
-    still collapses . and .. components for synthetic matter-registry paths that
-    may not be mounted on the build host.
+    Collapses . and .. components without following symlinks, ensuring
+    validation is host-independent and matches the Linux runtime environment.
     """
     if path.startswith("~"):
-        # Expand only the literal home marker for comparison; do not use the
-        # build host's home directory as a production value.
         expanded = path.replace("~", "/home/_matter_home", 1)
     else:
-        expanded = os.path.realpath(path)
+        expanded = path
     pure = PurePosixPath(expanded)
     parts: list[str] = []
     for part in pure.parts:
@@ -208,6 +205,10 @@ def validate_matter_definition(definition: dict[str, Any]) -> list[str]:
                 errors.append(
                     f"allowed_tooling_paths[{i}] must be an absolute POSIX path: "
                     f"{tooling_path}"
+                )
+            elif tooling_path == "/":
+                errors.append(
+                    f"allowed_tooling_paths[{i}] must not be the filesystem root '/'"
                 )
 
     allowed_domains = definition["allowed_domains"]
