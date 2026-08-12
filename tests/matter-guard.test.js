@@ -15,7 +15,7 @@
 
 'use strict';
 
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 const { createHash } = require('crypto');
 const fs = require('fs');
 const os = require('os');
@@ -92,6 +92,9 @@ function pre(session, tool, target, cwd, env, rawInput) {
 }
 
 const freshState = () => fs.rmSync(STATE, { recursive: true, force: true });
+
+// Test-only barrier for concurrent first-call race
+const BARRIER = path.join(TMP, 'barrier.pipe');
 
 // -- separation ------------------------------------------------------------
 

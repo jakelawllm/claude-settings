@@ -60,29 +60,40 @@ const WIN = process.platform === 'win32';
 const ARCHIVE_DIR = process.env.CLAUDE_MATTER_ARCHIVE || '_ai-record';
 const RECORD_ROOT = process.env.CLAUDE_RECORD_ROOT || '';
 const MODE = (process.env.CLAUDE_MATTER_MODE || 'enforce').toLowerCase();
+const MODE_VALID = ['enforce', 'warn', 'off'].includes(MODE);
 
 const STATE_DIR =
   process.env.CLAUDE_MATTER_STATE_DIR ||
   path.join(process.env.LOCALAPPDATA || os.homedir() || os.tmpdir(), 'claude-matter-guard');
 const AUDIT_LOG = path.join(STATE_DIR, 'would-have-blocked.log');
+const STATE_VERSION = 1;
+const MAX_BINDING_AGE_MS = 24 * 60 * 60 * 1000;
 
-/** Emit on fd 1 synchronously: an async write lost at exit is a silent allow. */
+/**
+ * Emit on fd 1 synchronously: an async write lost at exit is a silent allow.
+ * Returns false when the write failed so callers can fall back to exit 2.
+ */
 function emit(obj) {
   try {
     fs.writeSync(1, JSON.stringify(obj));
+    return true;
   } catch {
-    /* nothing further can be done; the caller's exit code carries no meaning */
+    return false;
   }
 }
 
 function deny(reason) {
-  emit({
+  const wrote = emit({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
       permissionDecision: 'deny',
       permissionDecisionReason: reason,
     },
   });
+  // SEC-06: exit 2 is the only reliable PreToolUse block if stdout failed.
+  if (!wrote) {
+    process.exit(2);
+  }
   return true;
 }
 
@@ -148,19 +159,25 @@ function canonical(p) {
  * the literal string is not a boundary. The deepest existing ancestor is
  * resolved and the unresolved remainder appended, which covers a write to a
  * file that does not exist yet.
+ *
+ * SEC-09: returns a typed result. Empty/unresolved targets must deny in
+ * enforce mode rather than disappear from the candidate set as non-client.
+ *   { ok: true, path }           — resolved
+ *   { ok: false, reason: 'empty' | 'too-long' | 'unresolved' }
  */
-function realCanonical(p) {
-  if (!p) return '';
+function realCanonicalTyped(p) {
+  if (!p) return { ok: false, reason: 'empty' };
   if (String(p).length > 4096) {
-    // path too long — cannot safely canonicalise
-    return ''; // empty string will not match any root, will be treated as non-client
+    return { ok: false, reason: 'too-long' };
   }
   let current = String(p);
   const tail = [];
   for (let i = 0; i < 64; i++) {
     try {
       const resolved = fs.realpathSync(current);
-      return canonical(tail.length ? path.join(resolved, ...tail.reverse()) : resolved);
+      const pathOut = canonical(tail.length ? path.join(resolved, ...tail.reverse()) : resolved);
+      if (!pathOut) return { ok: false, reason: 'unresolved' };
+      return { ok: true, path: pathOut };
     } catch {
       const parent = path.dirname(current);
       if (!parent || parent === current) break;
@@ -168,7 +185,13 @@ function realCanonical(p) {
       current = parent;
     }
   }
-  return '';
+  return { ok: false, reason: 'unresolved' };
+}
+
+/** String form for callers that only need a path; empty means unresolved. */
+function realCanonical(p) {
+  const r = realCanonicalTyped(p);
+  return r.ok ? r.path : '';
 }
 
 // --------------------------------------------------------------------------
@@ -233,11 +256,20 @@ function resolveRoots() {
   });
   usable.length = 0;
   deduped.forEach((r) => usable.push(r));
-  if (RECORD_ROOT) usable.push(realCanonical(RECORD_ROOT));
+
+  // Separate matter roots from record roots (SEC-04).
+  // Record roots are NOT matter roots — they are only used for archiving.
+  const recordRootCanon = RECORD_ROOT ? realCanonical(RECORD_ROOT) : null;
+  const matterRoots = usable.filter(r => r !== recordRootCanon);
+  const recordRoots = usable.filter(r => r === recordRootCanon);
 
   // Longest first: an archive nested inside the matters root must match as the
   // archive, not be read as a matter named after its own folder.
-  return { roots: usable.sort((a, b) => b.length - a.length), error: null };
+  return {
+    matterRoots: matterRoots.sort((a, b) => b.length - a.length),
+    recordRoots: recordRoots.sort((a, b) => b.length - a.length),
+    error: null
+  };
 }
 
 function isWithin(child, parent) {
@@ -248,39 +280,135 @@ function isWithin(child, parent) {
  * The matter a path belongs to, or null if it is not client material, or the
  * { type: 'root' } sentinel if it names a configured matters root itself: a
  * root is not a matter and must not be waved through as one (SEC-03).
+ *
+ * Pass candidate roots as a single combined list. Record-roots must be added
+ * separately so an archive directory inside the record root matches the archive
+ * rather than its first path segment.
  */
-function matterOf(candidate, roots) {
+function matterOf(candidate, matterRoots, recordRootCanon) {
   const c = realCanonical(candidate);
   if (!c) return null;
-  for (const root of roots) {
+
+  // Check matter roots first
+  for (const root of matterRoots) {
     if (!isWithin(c, root)) continue;
-    if (c === root) return { type: 'root' }; // the root itself is not a matter
+    if (c === root) return { type: 'root' };
     const name = c.slice(root.length + 1).split('/')[0];
-    // Identity is root-qualified (SEC-05): two roots are ordinarily aliases of
-    // the same share, so the same matter reached by any of them still
-    // compares equal, but a matter name that collides across genuinely
-    // distinct roots (e.g. /clients-a/ACME and /clients-b/ACME) does not.
-    // `dir` keeps the real location, which identity deliberately discards.
     return { name, id: 'matter:' + root + '/' + name, dir: root + '/' + name };
   }
+
+  // Check record root: paths under RECORD_ROOT/<matter>/... belong to that matter
+  if (recordRootCanon && isWithin(c, recordRootCanon) && c !== recordRootCanon) {
+    const relative = c.slice(recordRootCanon.length + 1);
+    const name = relative.split('/')[0];
+    if (name) {
+      // The matter identity uses the matterRoots[0] as the canonical root for ID purposes
+      // but the dir is the actual archive location
+      const canonicalMatterRoot = matterRoots[0] || recordRootCanon;
+      return { name, id: 'matter:' + canonicalMatterRoot + '/' + name, dir: recordRootCanon + '/' + name };
+    }
+  }
+
   return null;
 }
 
 /**
- * Explicit capability registry (SEC-06): every tool this guard reasons about,
- * and how. A tool absent from this list is 'unknown' rather than silently
- * contributing no targets, so a new built-in, plugin or MCP tool cannot reach
- * client material through a gap in a switch statement.
+ * Explicit capability registry (FUNC-01 / design §3.3): every tool this guard
+ * reasons about, and how. A tool absent from this list is 'unknown' rather
+ * than silently contributing no targets, so a new built-in, plugin or MCP tool
+ * cannot reach client material through a gap in a switch statement.
+ *
+ * INVENTORY SOURCE. The tool names below are taken from the Claude Code tools
+ * reference (https://code.claude.com/docs/en/tools-reference), read on
+ * 4 August 2026. Nothing here is invented. The reference is the authority: when
+ * the certified Claude Code version changes, the inventory must be re-read and
+ * this registry regenerated, because an unclassified tool stops working rather
+ * than failing open.
+ *
+ * INVENTORY COMPLETENESS. The built-in list is complete as at that reading.
+ * MCP tools (`mcp__<server>__<tool>`) and plugin tools are NOT enumerable from
+ * the reference and are therefore not classified: they deny in enforce mode.
+ * That is the intended direction, but it means an approved MCP server must be
+ * added here explicitly before its tools can be used.
+ *
+ * Categories:
+ *   filesystem    — path targets, checked against the matter binding
+ *   bash          — working directory only; the command string is not parsed
+ *   deny          — always refused
+ *   non-resource  — no path targets and no transmission
+ *   network       — no local path targets; egress is bounded elsewhere
+ *   transmission  — sends session content off the machine
+ *   orchestration — session and workflow control; no path targets
  */
 const TOOL_CAPS = {
-  Read: { targets: ['file_path'] },
-  Edit: { targets: ['file_path'] },
-  Write: { targets: ['file_path'] },
-  NotebookEdit: { targets: ['notebook_path', 'file_path'] },
-  Grep: { targets: ['path'] },
-  Glob: { targets: ['path'] },
-  Bash: { type: 'bash' }, // working-directory only; see the note at the head of the file
-  PowerShell: { type: 'deny' }, // SEC-02: always deny
+  // -- filesystem: the tools that name a path -----------------------------
+  Read: { type: 'filesystem', targets: ['file_path'] },
+  Edit: { type: 'filesystem', targets: ['file_path'] },
+  Write: { type: 'filesystem', targets: ['file_path'] },
+  NotebookEdit: { type: 'filesystem', targets: ['notebook_path', 'file_path'] },
+  Grep: { type: 'filesystem', targets: ['path'] },
+  Glob: { type: 'filesystem', targets: ['path'] },
+  LSP: { type: 'filesystem', targets: ['file_path', 'path'] },
+
+  // -- process ------------------------------------------------------------
+  // Bash and Monitor both execute shell commands and are bound by working
+  // directory only. The command string is not parsed; see the head of the file.
+  Bash: { type: 'bash' },
+  Monitor: { type: 'bash' },
+  PowerShell: { type: 'deny' },
+
+  // -- directory-changing: these move the session's working directory ------
+  // Both are refused: the working directory is the boundary the guard binds to,
+  // and a tool that relocates it can carry the session out of its matter.
+  EnterWorktree: { type: 'deny' },
+  ExitWorktree: { type: 'deny' },
+
+  // -- transmission: sends session content off this machine ---------------
+  Artifact: { type: 'deny' },
+  SendUserFile: { type: 'deny' },
+  ShareOnboardingGuide: { type: 'deny' },
+  RemoteTrigger: { type: 'deny' },
+  PushNotification: { type: 'deny' },
+
+  // -- network: fetches material in, no local path target ------------------
+  // Not denied here. Transmission control belongs in managed permissions, and
+  // duplicating it in the guard would make one control look like two.
+  WebFetch: { type: 'network' },
+  WebSearch: { type: 'network' },
+
+  // -- orchestration ------------------------------------------------------
+  // Skill must be allowed or skills/ai-policy-compliance cannot run, which is
+  // the defect FUNC-01 records. AskUserQuestion must be allowed or the skill
+  // cannot put the approval question the policy requires.
+  Skill: { type: 'orchestration' },
+  AskUserQuestion: { type: 'orchestration' },
+  Agent: { type: 'orchestration' },
+  Workflow: { type: 'orchestration' },
+  SendMessage: { type: 'orchestration' },
+  TaskCreate: { type: 'orchestration' },
+  TaskGet: { type: 'orchestration' },
+  TaskList: { type: 'orchestration' },
+  TaskUpdate: { type: 'orchestration' },
+  TaskStop: { type: 'orchestration' },
+  TaskOutput: { type: 'orchestration' },
+  TodoWrite: { type: 'orchestration' },
+  EnterPlanMode: { type: 'orchestration' },
+  ExitPlanMode: { type: 'orchestration' },
+  ReportFindings: { type: 'orchestration' },
+  ToolSearch: { type: 'orchestration' },
+  WaitForMcpServers: { type: 'orchestration' },
+  ListMcpResourcesTool: { type: 'orchestration' },
+  ReadMcpResourceTool: { type: 'orchestration' },
+  CronCreate: { type: 'orchestration' },
+  CronDelete: { type: 'orchestration' },
+  CronList: { type: 'orchestration' },
+  ScheduleWakeup: { type: 'orchestration' },
+
+  // -- non-resource -------------------------------------------------------
+  // EndConversation is documented as exempt from PreToolUse hooks, so the guard
+  // never sees it. It is classified for completeness, not because it is reached.
+  EndConversation: { type: 'non-resource' },
+  Notification: { type: 'non-resource' },
   SessionStart: { type: 'non-resource' },
   SessionEnd: { type: 'non-resource' },
 };
@@ -290,12 +418,25 @@ function capsOf(toolName) {
   return TOOL_CAPS[toolName] || { type: 'unknown' };
 }
 
-/** Every path a tool call would touch. An unknown tool contributes nothing. */
-function targetsOf(toolName, input) {
-  if (!input) return [];
-  const caps = capsOf(toolName);
-  if (!caps.targets) return [];
-  return caps.targets.map((k) => input[k]).filter((v) => typeof v === 'string');
+/**
+ * For SEC-09: collect candidates and their typed canonical results.
+ * Returns { touched, unresolved, nonClient } where unresolved is the set of
+ * candidates that failed to resolve (empty, too-long, or unresolvable).
+ */
+function collectCandidates(ev, matterRoots, recordRootCanon) {
+  const candidates = [...targetsOf(ev.tool_name, ev.tool_input), ev.cwd];
+  const touched = [];
+  const unresolved = [];
+  for (const c of candidates) {
+    const r = realCanonicalTyped(c);
+    if (!r.ok) {
+      unresolved.push({ candidate: c, reason: r.reason });
+      continue;
+    }
+    const m = matterOf(r.path, matterRoots, recordRootCanon);
+    if (m) touched.push(m);
+  }
+  return { touched, unresolved };
 }
 
 // --------------------------------------------------------------------------
@@ -331,25 +472,58 @@ function readBinding(sessionId) {
     throw err; // unreadable is not the same as absent
   }
   const b = JSON.parse(raw);
-  if (!b || typeof b.id !== 'string' || typeof b.name !== 'string' || typeof b.dir !== 'string') {
-    throw new Error('binding is malformed');
+  if (!b || typeof b.id !== 'string' || typeof b.name !== 'string' || typeof b.dir !== 'string' ||
+      b.version !== STATE_VERSION ||
+      !b.createdAt ||
+      (Date.now() - b.createdAt) > MAX_BINDING_AGE_MS) {
+    throw new Error('binding is malformed or expired');
   }
   return b;
 }
 
-/** Written to a temporary name and renamed, so a torn write is never read. */
+/**
+ * Atomic exclusive create (SEC-03). On EEXIST, reread and compare: identical
+ * binding is a no-op; mismatch throws so the caller denies.
+ * Returns the durable binding record that is now on disk.
+ */
 function writeBinding(sessionId, binding) {
   ensureStateDir();
   const target = statePath(sessionId);
-  const tmp = `${target}.${process.pid}.tmp`;
-  const fd = fs.openSync(tmp, 'w', 0o600);
+  const record = {
+    version: STATE_VERSION,
+    id: binding.id,
+    name: binding.name,
+    dir: binding.dir,
+    createdAt: Date.now(),
+    hostUser: process.env.USER || process.env.USERNAME || 'unknown',
+    hostEnv: process.platform,
+  };
+  let fd;
   try {
-    fs.writeSync(fd, JSON.stringify(binding));
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
+    fd = fs.openSync(target, 'wx', 0o600);
+    try {
+      fs.writeSync(fd, JSON.stringify(record));
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+    return record;
+  } catch (e) {
+    if (e && e.code === 'EEXIST') {
+      const existing = readBinding(sessionId);
+      if (!existing) {
+        throw new Error('binding file exists but could not be read after race');
+      }
+      if (existing.id !== record.id) {
+        const err = new Error('binding conflict: session already bound to a different matter');
+        err.code = 'ECONFLICT';
+        err.existing = existing;
+        throw err;
+      }
+      return existing;
+    }
+    throw e;
   }
-  fs.renameSync(tmp, target);
 }
 
 // --------------------------------------------------------------------------
@@ -384,6 +558,11 @@ function warn(ev, binding, touched) {
 function preToolUse(ev) {
   if (MODE === 'off') return;
 
+  // SEC-08: validate mode is known before proceeding
+  if (!MODE_VALID) {
+    return denyFault(`CLAUDE_MATTER_MODE must be enforce, warn, or off; got ${MODE}`);
+  }
+
   // SEC-06: a tool outside the approved registry is refused in enforce mode
   // rather than silently passed through as contributing no targets.
   const caps = capsOf(ev.tool_name);
@@ -396,21 +575,34 @@ function preToolUse(ev) {
     return denyFault('unknown tool: ' + ev.tool_name + ' — not in the approved tool registry');
   }
 
-  const { roots, error } = resolveRoots();
+  const { matterRoots, error } = resolveRoots();
   if (error) {
     if (MODE !== 'enforce') return; // nothing to warn about without a boundary
     return denyFault(error);
   }
 
-  // SEC-03: a session launched above the matters root can reach every matter
+  // SEC-04: a session launched above a matters root can reach every matter
   // from its working directory alone, with no matter-qualified path in play.
+  // Evaluate only matter roots (not record roots) with some().
   const cwdCanon = realCanonical(ev.cwd);
-  if (cwdCanon && roots.length && roots.every((r) => r !== cwdCanon && isWithin(r, cwdCanon))) {
+  if (cwdCanon && matterRoots.length && matterRoots.some((r) => r === cwdCanon || isWithin(r, cwdCanon))) {
     return denyFault('session launched above matters root — launch from inside one matter folder');
   }
 
-  const candidates = [...targetsOf(ev.tool_name, ev.tool_input), ev.cwd];
-  const touched = candidates.map((c) => matterOf(c, roots)).filter(Boolean);
+  // Record root canonical for matterOf
+  const recordRootCanon = RECORD_ROOT ? realCanonical(RECORD_ROOT) : null;
+
+  const { touched, unresolved } = collectCandidates(ev, matterRoots, recordRootCanon);
+
+  // SEC-09: a canonicalisation failure is a resolution failure, not evidence
+  // that the path is non-client. Deny in enforce mode rather than silently
+  // dropping the candidate from the set considered.
+  if (unresolved.length && MODE === 'enforce') {
+    return denyFault(
+      `a path could not be canonicalised (${unresolved[0].reason}) — cannot verify it stays within one matter`
+    );
+  }
+
   if (touched.some((t) => t.type === 'root')) {
     return denyFault(
       'path equals a configured matters root — sessions must be launched from inside one matter, not at the root level'
@@ -418,6 +610,8 @@ function preToolUse(ev) {
   }
   if (touched.length === 0) return; // no client material in play
 
+  // SEC-07: validate complete candidate set before writing any binding.
+  // Never bind on a call that will be denied.
   let binding;
   try {
     binding = readBinding(ev.session_id);
@@ -426,20 +620,10 @@ function preToolUse(ev) {
     return denyFault(`the session's matter binding could not be read: ${err.message}`);
   }
 
+  // First, check if any touched matter differs from existing binding.
+  // If so, deny the call WITHOUT writing a new binding.
   for (const t of touched) {
-    if (!binding) {
-      binding = { id: t.id, name: t.name, dir: t.dir };
-      try {
-        writeBinding(ev.session_id, binding);
-      } catch (err) {
-        if (MODE !== 'enforce') return;
-        // Without durable state the next call rebinds, and the session can
-        // move between matters one call at a time.
-        return denyFault(`the session's matter binding could not be saved: ${err.message}`);
-      }
-      continue;
-    }
-    if (t.id !== binding.id) {
+    if (binding && t.id !== binding.id) {
       if (MODE === 'warn') return warn(ev, binding, t);
       return deny(
         `Blocked by the firm's matter-separation policy. This session is ` +
@@ -450,11 +634,59 @@ function preToolUse(ev) {
       );
     }
   }
+
+  // SEC-07: never bind on a call that will be denied. If the candidate set
+  // already contains more than one matter, refuse without writing state.
+  if (!binding && touched.length > 0) {
+    const firstId = touched[0].id;
+    const mixed = touched.find((t) => t.id !== firstId);
+    if (mixed) {
+      if (MODE === 'warn') return warn(ev, { name: touched[0].name }, mixed);
+      return deny(
+        `Blocked by the firm's matter-separation policy. This request reaches ` +
+          `more than one matter ("${touched[0].name}" and "${mixed.name}") and ` +
+          `cannot bind the session. Start a session inside one matter only.`
+      );
+    }
+    try {
+      // Test-only seam: sleep before exclusive create so concurrent first
+      // calls can be forced to race. Production never sets this.
+      if (process.env.CLAUDE_MATTER_TEST_DELAY_MS) {
+        const ms = Number(process.env.CLAUDE_MATTER_TEST_DELAY_MS) || 0;
+        if (ms > 0) {
+          const end = Date.now() + ms;
+          while (Date.now() < end) {
+            /* busy-wait: Atomics.wait is unavailable without SharedArrayBuffer */
+          }
+        }
+      }
+      writeBinding(ev.session_id, {
+        id: touched[0].id,
+        name: touched[0].name,
+        dir: touched[0].dir,
+      });
+    } catch (err) {
+      if (MODE !== 'enforce') return;
+      if (err && err.code === 'ECONFLICT') {
+        return deny(
+          `Blocked by the firm's matter-separation policy. This session is ` +
+            `confined to the matter "${err.existing.name}" and the path requested ` +
+            `belongs to "${touched[0].name}". Do not retry, and do not attempt another ` +
+            `route to the same file. Close this session and start a new one in ` +
+            `the other matter's folder.`
+        );
+      }
+      // Without durable state the next call rebinds, and the session can
+      // move between matters one call at a time.
+      return denyFault(`the session's matter binding could not be saved: ${err.message}`);
+    }
+  }
 }
 
 function sessionStart(ev) {
-  const { roots, error } = resolveRoots();
-  const m = error ? null : matterOf(ev.cwd, roots);
+  const { matterRoots, error } = resolveRoots();
+  const recordRootCanon = RECORD_ROOT ? realCanonical(RECORD_ROOT) : null;
+  const m = error ? null : matterOf(ev.cwd, matterRoots, recordRootCanon);
   const context = error
     ? `The matter separation guard is not usable: ${error}. Client work should ` +
       `not proceed until it is fixed.`
@@ -469,27 +701,52 @@ function sessionStart(ev) {
 
 /** File the transcript. SessionEnd guarantees the transcript is complete. */
 function sessionEnd(ev) {
-  const { roots, error } = resolveRoots();
+  const { error } = resolveRoots();
   if (error || !ev.transcript_path) return;
 
+  // REC-03: treat unreadable or inconsistent binding as an archive exception.
+  // Do not silently fall back to cwd-derived matterOf.
   let binding = null;
+  let bindingError = null;
   try {
     binding = readBinding(ev.session_id);
-  } catch {
+  } catch (err) {
+    bindingError = err;
     binding = null;
   }
-  if (!binding) binding = matterOf(ev.cwd, roots);
-  if (!binding || !binding.dir || !binding.name) return;
+
+  if (!binding) {
+    // REC-01/02/03: corrupt/missing binding must not guess an archive path.
+    // Emit an alert and do not write a record.
+    emit({
+      systemMessage:
+        `Session record could NOT be filed: binding unreadable or inconsistent ` +
+        `(${bindingError ? bindingError.message : 'no binding'}). ` +
+        `Place the transcript in quarantine and raise an operational alert.`,
+    });
+    return;
+  }
+
+  // Use stable matter ID from binding; archive directory uses binding.name only
+  // for human readability. The directory structure under RECORD_ROOT uses the
+  // binding's id for uniqueness when matters share names across roots.
+  if (!binding.dir || !binding.name) return;
 
   try {
     if (!fs.existsSync(ev.transcript_path)) return;
     const dest = RECORD_ROOT
-      ? path.join(RECORD_ROOT, binding.name)
+      ? path.join(
+          RECORD_ROOT,
+          createHash('sha256').update(binding.id).digest('hex').slice(0, 16),
+          binding.name
+        )
       : path.join(binding.dir.replace(/\//g, path.sep), ARCHIVE_DIR);
     fs.mkdirSync(dest, { recursive: true });
 
     const stamp = fs.statSync(ev.transcript_path).mtime.toISOString().replace(/[:.]/g, '-');
-    const name = `session-${stamp}-${String(ev.session_id).slice(0, 8)}.jsonl`;
+    // REC-02: use full domain-separated session hash for filename uniqueness.
+    const sessionHash = createHash('sha256').update('matter-guard:' + String(ev.session_id)).digest('hex').slice(0, 16);
+    const name = `session-${stamp}-${sessionHash}.jsonl`;
     const final = path.join(dest, name);
     const tmp = `${final}.${process.pid}.part`;
     // Copy then rename, so an interrupted copy never leaves a partial file
