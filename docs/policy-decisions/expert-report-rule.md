@@ -36,3 +36,26 @@ Update the standing instruction and compliance skill to reflect the clause 7.3 p
 - **Decided by:** [PENDING]
 - **Date:** [PENDING]
 - **Rationale:** [PENDING]
+
+## Owner packet (fill to close this gate)
+
+Do not edit this section to invent a decision. The legal/risk owner supplies the values below; engineering then applies the matching option.
+
+| Field | Owner supplies |
+|---|---|
+| Chosen option | `A` (strict prohibition) or `B` (leave-gated permission) |
+| Decided by | Named legal/risk owner |
+| Date | ISO date of decision |
+| Rationale | Short written reason on the matter / policy file |
+
+**After Option A is recorded, engineering must:**
+1. Remove the clause 7.3 expert-report pathway from `ai-policy-legal-practice-template.docx` (authoritative) and regenerate the `.md` with `scripts/docx-to-md.py`.
+2. Confirm `managed-settings.json` `claudeMd` and `skills/ai-policy-compliance/SKILL.md` already state the absolute ban (no change if already aligned).
+3. Re-run `python scripts/check-clause-refs.py` and the compliance test suite.
+
+**After Option B is recorded, engineering must:**
+1. Leave clause 7.3 in the policy DOCX (or adjust only if the leave conditions change).
+2. Update `managed-settings.json` `claudeMd` and `skills/ai-policy-compliance/SKILL.md` to the leave-gated pathway (prior leave on the matter file required).
+3. Re-run clause-ref and compliance tests.
+
+Until the Decision record fields above are non-PENDING, production preflight and the release checklist treat this gate as open.
