@@ -54,7 +54,7 @@ IDENTIFYING = [
     ("Private IPv4 (172.16-31.x.x)", r"\b172\.(?:1[6-9]|2[0-9]|3[0-1])\.\d{1,3}\.\d{1,3}\b"),
     ("Private IPv4 (10.x.x.x)", r"\b10\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"),
     ("Tailscale host", r"\b[a-z0-9-]+\.ts\.net\b"),
-    ("UNC path", r"\\\\[a-zA-Z0-9_.-]+\\[a-zA-Z0-9_.$-]+"),
+    ("UNC path", r"\\\\[a-zA-Z0-9_.-]+\\[a-zA-Z0-9_.$-]+(?:\\[^\s]*)?"),
 ]
 
 # Not a known credential shape, but a long run of base64-alphabet characters
