@@ -38,7 +38,7 @@ It is offered for comparison and adaptation. It is a configuration baseline, not
 
 `ai-policy-legal-practice-template.docx` is the policy these files exist to enforce, as a template for an Australian practice. `ai-policy-legal-practice-template.md` is a rendering of it produced by `scripts/docx-to-md.py`, so that it can be read and diffed here. The `.docx` is the authoritative document, and where it and the configuration differ the configuration is ordinarily what needs correcting.
 
-There is one deliberate exception, in the practice policy. Clause 7.3 prohibits using a tool to draft an expert report "without prior leave of the court where leave is required", so the clause permits the work once leave is obtained. `claudeMd` and the compliance skill prohibit it outright and do not ask about leave. That is a practice deciding to be stricter than its own policy, not a drafting error: a firm adopting this template either amends clause 7.3 to match, or relaxes the two instruments to match the clause. It should not be left as it stands here without a decision, because a practitioner reading the policy would be told the work is available and the tool would refuse it.
+Clause 7.3, the managed standing instruction, and the compliance skill now say the same thing about expert reports: the practice does not use a tool to draft or prepare any part of one, and leave of the court does not cure that ban. The former leave-gated wording in clause 7.3 was removed on 2026-08-12 under the Option A decision recorded in `docs/policy-decisions/expert-report-rule.md`. An expert's own use of a tool remains a separate question under clause 11.
 
 ## Before you deploy anything
 
@@ -177,7 +177,6 @@ If any red item remains unresolved, the answer is no-go for production. If the r
 - The guard still runs in `warn`, or `CLAUDE_MATTER_ROOTS` still carries placeholders rather than the practice's real roots.
 - Native Windows is being treated as though it provided hard matter isolation. It does not: the only certified production path in this release is a Linux container, or WSL2 using the same Linux container path; macOS with Claude sandbox alone is an open question and not certified for confidential-matter use in this release. Where the boundary needs to hold, use the certified path.
 - The real Claude Code end-to-end tier has not been run on the deployment candidate, so the hook has not been shown to run inside a real session with the payload Claude Code actually sends.
-- The deliberate mismatch on expert reports remains unresolved: the policy permits the work where prior leave is obtained, while the standing instruction and compliance skill prohibit it outright.
 - There is no versioned release point, rollback path, or named internal owner for maintaining the baseline against Claude Code changes.
 
 ### Amber — pilot only unless tightened

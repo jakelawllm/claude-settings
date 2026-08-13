@@ -37,7 +37,7 @@ Three layers, and the distinction between them is the point.
 
 **`skills/ai-policy-compliance/SKILL.md`** decides what may be *produced* and what must be said about it: refuses to draft evidence, requires a verification worklist, and never claims a citation has been checked.
 
-**The policy documents are the authority.** The `.docx` files are authoritative and the `.md` files are generated from them by `scripts/docx-to-md.py` — never edit a `.md` by hand. Where the configuration and the policy disagree, the configuration is ordinarily what needs correcting. The README records the one deliberate exception (clause 7.3, expert reports).
+**The policy documents are the authority.** The `.docx` files are authoritative and the `.md` files are generated from them by `scripts/docx-to-md.py` — never edit a `.md` by hand. Where the configuration and the policy disagree, the configuration is ordinarily what needs correcting. Clause 7.3 (expert reports), the standing instruction, and the compliance skill are aligned on an absolute prohibition; see `docs/policy-decisions/expert-report-rule.md`.
 
 `ai-protocol-barristers-chambers` is a separate instrument with its own clause numbering. Nothing in the configuration is wired to it, and the skill says so.
 
