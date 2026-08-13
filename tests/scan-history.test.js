@@ -267,6 +267,36 @@ function run() {
     );
     checkRejected('22 nested foreign delimiters still fail', scan(dir));
   }
+
+  // 23: The conventional, non-routable UNC example in file content must be
+  // allowed. Historical path-parser docstrings used exactly this form.
+  {
+    const dir = path.join(TMP, 'unc-example-allowed');
+    makeRepo(dir);
+    commitFileContent(
+      dir,
+      'docstring example',
+      'Accepts Windows drive letters (C:\\), UNC (\\\\server\\share), and POSIX (/).\n'
+    );
+    checkAllowed('23 conventional UNC example allowed', scan(dir));
+  }
+
+  // 24: An arbitrary UNC path must still fail — the allowance is exact-match only.
+  {
+    const dir = path.join(TMP, 'unc-arbitrary-rejected');
+    makeRepo(dir);
+    commitFileContent(dir, 'real path', 'mount \\\\corp-fs01\\ClientMatter for access\n');
+    checkRejected('24 arbitrary UNC path still fails', scan(dir));
+  }
+
+  // 25: A share name that only starts with the allowed example must still fail
+  // — the allowance matches the captured substring exactly, not a prefix.
+  {
+    const dir = path.join(TMP, 'unc-example-prefix-rejected');
+    makeRepo(dir);
+    commitFileContent(dir, 'lookalike share', 'mount \\\\server\\shareddrive for access\n');
+    checkRejected('25 lookalike UNC share still fails', scan(dir));
+  }
 }
 
 try {

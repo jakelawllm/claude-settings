@@ -78,6 +78,9 @@ PATH_ALLOW = [
 ALLOW_MATCH = [
     re.compile(r"example\.invalid"),
     re.compile(r"nas\.example"),
+    # The path parser docstrings use this conventional, non-routable UNC example;
+    # allow only this exact example, not arbitrary UNC paths.
+    re.compile(r"^\\\\server\\share$"),
     # Sandbox schema field lists contain long slash-separated identifier runs;
     # they are documented field names, not unlabelled credentials.
     re.compile(r"filesystem\.denyRead/allowRead/allowWrite/allowManagedReadPathsOnly"),
