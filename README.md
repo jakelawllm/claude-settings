@@ -102,7 +102,9 @@ The legacy Windows path under `ProgramData` is no longer read. The same content 
 
 File-based and MDM delivery work on any plan, because they are enforced on the device rather than by the account. Server-managed delivery through the admin console, which pushes policy at sign-in and removes the risk of a machine that never received the file, requires Team or Enterprise.
 
-The user file goes to `~/.claude/settings.json`, or `%USERPROFILE%\.claude\settings.json` on Windows.
+The user file goes to `~/.claude/settings.json`, or `%USERPROFILE%\.claude\settings.json` on Windows. User settings are a fallback for a sole practitioner or a small practice without managed deployment; they do not replace the organisation-level controls on a managed device.
+
+A per-matter file is separate again: place `matter-settings.json` as `.claude/settings.json` inside the matter folder. Use it for matter-specific restrictions such as denying WebFetch; it is not a substitute for the managed settings, the matter guard or the operating-system sandbox.
 
 The skill and the hook go into the same system directory as the organisation file, which is what makes them organisation policy rather than a preference a user can change:
 
