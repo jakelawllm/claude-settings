@@ -305,6 +305,33 @@ function run() {
     commitFileContent(dir, 'deeper path', String.raw`\\server\share\private`);
     checkRejected('26 deeper synthetic UNC path still fails', scan(dir));
   }
+
+  // 27: A real UNC path whose share name starts with the synthetic example but
+  // continues with a space must still fail.
+  {
+    const dir = path.join(TMP, 'unc-example-space-suffix-rejected');
+    makeRepo(dir);
+    commitFileContent(dir, 'space suffix', String.raw`\\server\share name\private`);
+    checkRejected('27 UNC share with space suffix still fails', scan(dir));
+  }
+
+  // 28: A real UNC path whose share name starts with the synthetic example but
+  // continues with @ must still fail.
+  {
+    const dir = path.join(TMP, 'unc-example-at-suffix-rejected');
+    makeRepo(dir);
+    commitFileContent(dir, 'at suffix', String.raw`\\server\share@dept\private`);
+    checkRejected('28 UNC share with @ suffix still fails', scan(dir));
+  }
+
+  // 29: A real UNC path whose share name starts with the synthetic example but
+  // continues with non-ASCII must still fail.
+  {
+    const dir = path.join(TMP, 'unc-example-unicode-suffix-rejected');
+    makeRepo(dir);
+    commitFileContent(dir, 'unicode suffix', String.raw`\\server\shareé\private`);
+    checkRejected('29 UNC share with unicode suffix still fails', scan(dir));
+  }
 }
 
 try {

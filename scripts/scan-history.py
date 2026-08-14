@@ -196,13 +196,14 @@ def match_is_allowed(filename, content, match, source="diff", label=""):
     match_text = match.group(0)
     if any(a.search(match_text) for a in ALLOW_MATCH):
         return True
-    # Historical path-parser docstrings use this conventional synthetic UNC
-    # example. The identifying regex stops after the share name, so also prove
-    # that the source text does not continue into a deeper path.
+    # Historical path-parser docstrings use this exact conventional synthetic
+    # UNC example. Match the full line: the identifying regex may stop after
+    # the share name before an unrecognised path character.
     if (
         label == "UNC path"
         and match_text == r"\\server\share"
-        and content[match.end() : match.end() + 1] not in ("\\", "/")
+        and content.strip()
+        == r"Accepts Windows drive letters (C:\), UNC (\\server\share), and POSIX (/)."
     ):
         return True
     # GitHub's synthetic pull_request merge commit messages contain two bare
@@ -267,7 +268,7 @@ def iter_added_lines(diff_text):
         if m:
             lineno = int(m.group(1)) - 1
             continue
-        if line.startswith("+++") or line.startswith("---"):
+        if line.startswith(("+++", "---")):
             continue
         if line.startswith("+"):
             lineno += 1
