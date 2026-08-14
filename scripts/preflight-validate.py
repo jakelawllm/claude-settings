@@ -83,6 +83,12 @@ def _parse_markdown_table(text: str) -> list[list[str]]:
     return rows
 
 
+def _status_value(line: str) -> str:
+    stripped = line.strip()
+    direct = re.match(r"(?i)^status\s*:\s*(.*)$", stripped)
+    return direct.group(1).strip() if direct else stripped
+
+
 def _find_status(text: str) -> str:
     """Extract the status value from a '## Status' heading or a 'Status:' line.
     Handles a blank line after the heading by scanning forward until a non-empty line.
@@ -90,16 +96,16 @@ def _find_status(text: str) -> str:
     lines = text.splitlines()
     for i, ln in enumerate(lines):
         stripped = ln.strip()
-        # Direct status line like "Status: APPROVED"
-        if stripped.startswith("Status:") or stripped.startswith("Status "):
-            return stripped
+        # Direct status line like "Status: APPROVED".
+        if re.match(r"(?i)^status\s*:", stripped):
+            return _status_value(stripped)
         # Markdown heading "## Status" (or any number of #) – look ahead for first non-blank.
         if stripped.lstrip("#").strip() == "Status" and i + 1 < len(lines):
             # Scan forward from the line after the heading until a non-blank line.
             for j in range(i + 1, len(lines)):
                 candidate = lines[j].strip()
                 if candidate:
-                    return candidate
+                    return _status_value(candidate)
             return ""  # No non-blank line after heading.
     return ""
 
@@ -117,19 +123,59 @@ def _validate_expert_report_rule(text: str) -> list[str]:
     status = _find_status(text)
     if not status:
         return ["expert-report rule has no status line"]
-    if "APPROVED" not in status.upper():
+    # Require a positive leading APPROVED word. Substring checks would accept
+    # "NOT APPROVED" and "UNAPPROVED".
+    if not re.match(r"(?i)^\s*APPROVED\b", status):
         return [f"expert-report rule status is not APPROVED: {status!r}"]
     return []
 
 
-def _validate_oauth_token_management(text: str) -> list[str]:
-    """Status must say APPROVED, not merely fail to say PENDING."""
+def _find_decision_field(text: str, label: str) -> str:
+    """Return a decision-record bullet value by label."""
+    pattern = re.compile(rf"^-\s+(?:\*\*)?{re.escape(label)}(?:\*\*)?:\s*(.+)$", re.MULTILINE)
+    match = pattern.search(text)
+    return match.group(1).strip() if match else ""
+
+
+def _validate_oauth_token_management(text: str, mode: str) -> list[str]:
+    """Static-token exceptions must be scope-aware and positively recorded."""
     status = _find_status(text)
     if not status:
         return ["oauth-token-management has no status line"]
-    if "APPROVED" not in status.upper():
+    # Require a positive leading APPROVED word. Substring checks would accept
+    # "NOT APPROVED" and "UNAPPROVED".
+    if not re.match(r"(?i)^\s*APPROVED\b", status):
         return [f"oauth-token-management status is not APPROVED: {status!r}"]
-    return []
+    if mode == "production" and "INTERNAL BETA" in status.upper():
+        return [f"oauth-token-management status is not approved for production: {status!r}"]
+
+    required_fields = (
+        "Decision",
+        "Decided by",
+        "Date",
+        "Rationale",
+        "Token owner",
+        "Storage location",
+        "Minimum permissions",
+        "Rotation interval",
+        "Last rotated",
+        "Next rotation due",
+        "Emergency revocation procedure",
+        "Monitoring owner",
+        "Migration trigger",
+    )
+    issues: list[str] = []
+    for field in required_fields:
+        value = _find_decision_field(text, field)
+        if not value or _is_register_placeholder(value):
+            issues.append(f"oauth-token-management field {field!r} is unresolved")
+
+    if mode == "production":
+        for field in ("Date", "Last rotated", "Next rotation due"):
+            value = _find_decision_field(text, field)
+            if value and not ISO_DATE_RE.search(value):
+                issues.append(f"oauth-token-management field {field!r} has no ISO date")
+    return issues
 
 
 def _validate_supplier_evidence_register(text: str) -> list[str]:
@@ -183,8 +229,10 @@ def _validate_data_flow_model(text: str) -> list[str]:
     evidences = re.findall(r"\*\*Evidence:\*\*\s*(.+)", text)
     if len(names) < 3 or len(dates) < 3 or len(evidences) < 3:
         return [
-            "data-flow model must have 3 owner sign-offs (privacy, security, records) "
-            "each with Name, Date and Evidence"
+            (
+                "data-flow model must have 3 owner sign-offs "
+                "(privacy, security, records) each with Name, Date and Evidence"
+            )
         ]
     issues: list[str] = []
     labels = ("privacy", "security", "records")
@@ -296,7 +344,10 @@ def check_governance_registers(
                 warnings.append(msg)
             continue
         text = full.read_text(encoding="utf-8")
-        issues = validator(text)
+        if rel_path == "docs/policy-decisions/oauth-token-management.md":
+            issues = validator(text, mode)
+        else:
+            issues = validator(text)
         if issues:
             for issue in issues:
                 msg = f"governance register unresolved: {rel_path} — {issue}"
@@ -411,9 +462,8 @@ def validate(
         "disableRemoteControl": "disableRemoteControl is not true",
     }
     for key, msg in managed_locks.items():
-        if settings.get(key) is not True:
-            if mode == "production":
-                errors.append(msg)
+        if mode == "production" and settings.get(key) is not True:
+            errors.append(msg)
 
     # --- Sandbox managed read/network locks (production only) ---------------
     fs = sandbox.get("filesystem", {})
@@ -458,9 +508,12 @@ def validate(
             str(force_login)
         ):
             errors.append("forceLoginOrgUUID is not a valid UUID")
-    elif force_login and not contains_placeholder(str(force_login)):
-        if not validate_uuid(str(force_login)):
-            errors.append("forceLoginOrgUUID is not a valid UUID")
+    elif (
+        force_login
+        and not contains_placeholder(str(force_login))
+        and not validate_uuid(str(force_login))
+    ):
+        errors.append("forceLoginOrgUUID is not a valid UUID")
 
     # --- OTLP TLS -----------------------------------------------------------
     if telemetry_enabled:
@@ -469,12 +522,13 @@ def validate(
                 errors.append(
                     "OTEL_EXPORTER_OTLP_ENDPOINT is missing while telemetry is enabled"
                 )
-        elif not contains_placeholder(str(otel_endpoint)):
-            if not str(otel_endpoint).startswith("https://"):
-                errors.append(
-                    "OTEL_EXPORTER_OTLP_ENDPOINT must start with https:// "
-                    "when telemetry is enabled"
-                )
+        elif not contains_placeholder(str(otel_endpoint)) and not str(
+            otel_endpoint
+        ).startswith("https://"):
+            errors.append(
+                "OTEL_EXPORTER_OTLP_ENDPOINT must start with https:// "
+                "when telemetry is enabled"
+            )
 
     # --- MCP policy ---------------------------------------------------------
     if mode == "production":

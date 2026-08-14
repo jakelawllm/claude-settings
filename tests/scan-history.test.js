@@ -268,8 +268,8 @@ function run() {
     checkRejected('22 nested foreign delimiters still fail', scan(dir));
   }
 
-  // 23: The conventional, non-routable UNC example in file content must be
-  // allowed. Historical path-parser docstrings used exactly this form.
+  // 23: The conventional synthetic UNC example in file content is allowed.
+  // Historical path-parser docstrings used exactly this form.
   {
     const dir = path.join(TMP, 'unc-example-allowed');
     makeRepo(dir);
@@ -281,21 +281,56 @@ function run() {
     checkAllowed('23 conventional UNC example allowed', scan(dir));
   }
 
-  // 24: An arbitrary UNC path must still fail — the allowance is exact-match only.
+  // 24: An arbitrary UNC path must still fail.
   {
     const dir = path.join(TMP, 'unc-arbitrary-rejected');
     makeRepo(dir);
-    commitFileContent(dir, 'real path', 'mount \\\\corp-fs01\\ClientMatter for access\n');
+    commitFileContent(dir, 'real path', String.raw`\\corp-fs01\ClientMatter`);
     checkRejected('24 arbitrary UNC path still fails', scan(dir));
   }
 
-  // 25: A share name that only starts with the allowed example must still fail
-  // — the allowance matches the captured substring exactly, not a prefix.
+  // 25: A share name that only starts with the allowed example must still fail.
   {
     const dir = path.join(TMP, 'unc-example-prefix-rejected');
     makeRepo(dir);
-    commitFileContent(dir, 'lookalike share', 'mount \\\\server\\shareddrive for access\n');
+    commitFileContent(dir, 'lookalike share', String.raw`\\server\shareddrive`);
     checkRejected('25 lookalike UNC share still fails', scan(dir));
+  }
+
+  // 26: A deeper path under the allowed synthetic share must still fail. The
+  // scanner regex captures only server+share, so allowance must inspect suffix.
+  {
+    const dir = path.join(TMP, 'unc-example-deeper-rejected');
+    makeRepo(dir);
+    commitFileContent(dir, 'deeper path', String.raw`\\server\share\private`);
+    checkRejected('26 deeper synthetic UNC path still fails', scan(dir));
+  }
+
+  // 27: A real UNC path whose share name starts with the synthetic example but
+  // continues with a space must still fail.
+  {
+    const dir = path.join(TMP, 'unc-example-space-suffix-rejected');
+    makeRepo(dir);
+    commitFileContent(dir, 'space suffix', String.raw`\\server\share name\private`);
+    checkRejected('27 UNC share with space suffix still fails', scan(dir));
+  }
+
+  // 28: A real UNC path whose share name starts with the synthetic example but
+  // continues with @ must still fail.
+  {
+    const dir = path.join(TMP, 'unc-example-at-suffix-rejected');
+    makeRepo(dir);
+    commitFileContent(dir, 'at suffix', String.raw`\\server\share@dept\private`);
+    checkRejected('28 UNC share with @ suffix still fails', scan(dir));
+  }
+
+  // 29: A real UNC path whose share name starts with the synthetic example but
+  // continues with non-ASCII must still fail.
+  {
+    const dir = path.join(TMP, 'unc-example-unicode-suffix-rejected');
+    makeRepo(dir);
+    commitFileContent(dir, 'unicode suffix', String.raw`\\server\shareé\private`);
+    checkRejected('29 UNC share with unicode suffix still fails', scan(dir));
   }
 }
 

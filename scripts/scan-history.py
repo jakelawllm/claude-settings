@@ -78,9 +78,6 @@ PATH_ALLOW = [
 ALLOW_MATCH = [
     re.compile(r"example\.invalid"),
     re.compile(r"nas\.example"),
-    # The path parser docstrings use this conventional, non-routable UNC example;
-    # allow only this exact example, not arbitrary UNC paths.
-    re.compile(r"^\\\\server\\share$"),
     # Sandbox schema field lists contain long slash-separated identifier runs;
     # they are documented field names, not unlabelled credentials.
     re.compile(r"filesystem\.denyRead/allowRead/allowWrite/allowManagedReadPathsOnly"),
@@ -199,6 +196,16 @@ def match_is_allowed(filename, content, match, source="diff", label=""):
     match_text = match.group(0)
     if any(a.search(match_text) for a in ALLOW_MATCH):
         return True
+    # Historical path-parser docstrings use this exact conventional synthetic
+    # UNC example. Match the full line: the identifying regex may stop after
+    # the share name before an unrecognised path character.
+    if (
+        label == "UNC path"
+        and match_text == r"\\server\share"
+        and content.strip()
+        == r"Accepts Windows drive letters (C:\), UNC (\\server\share), and POSIX (/)."
+    ):
+        return True
     # GitHub's synthetic pull_request merge commit messages contain two bare
     # 40-hex SHAs. Accept only when the whole line is that exact platform form
     # and the matched text is one of those SHAs -- not any other long hex run
@@ -261,7 +268,7 @@ def iter_added_lines(diff_text):
         if m:
             lineno = int(m.group(1)) - 1
             continue
-        if line.startswith("+++") or line.startswith("---"):
+        if line.startswith(("+++", "---")):
             continue
         if line.startswith("+"):
             lineno += 1
