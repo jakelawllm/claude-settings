@@ -168,7 +168,7 @@ These gates depend on the deployment environment and cannot be proven by public 
 - platform exclusion evidence confirming native Windows is not treated as hard matter isolation;
 - manifest signature verification confirming the installed bundle matches the approved release.
 
-Record the command output or artefact path for each gate in the release notes.
+Record the owner, date and controlled evidence reference for each gate in `docs/operational-evidence-register.md`. Release notes may then point to the corresponding register entry and artefact path.
 
 
 ## Required checks and repository protection
@@ -209,7 +209,7 @@ GitHub secret scanning and push protection must also be enabled before any publi
 
 - [ ] `node tests/records-schema.test.js` passes.
 - [ ] `docs/records-schema.md` is current for the release bundle.
-- [ ] The external records service owner confirms storage, encryption, retention, legal hold, deletion, access logging and alerting are implemented outside this repository.
+- [ ] The external records service owner confirms storage, encryption, retention, legal hold, deletion, access logging and alerting are implemented outside this repository. Record the completion reference in `docs/operational-evidence-register.md`.
 - [ ] A synthetic SessionEnd archive success and a monitored failure have both been observed.
 
 ## Named release owners
@@ -243,12 +243,12 @@ The repository can prepare the evidence framework, but cannot close these gates 
 - [ ] Template preflight mode passes against `managed-settings.json`.
 - [ ] Production preflight mode passes against the rendered settings file.
 - [ ] Release manifest is generated and verified.
-- [ ] Live E2E has passed on a signed-in Claude Code installation. **Blocked on a Windows host** — candidate path `Z:` is not usable on this Linux checkout; re-run on the Windows host with `CLAUDE_MATTER_ROOTS` set to a real matter root. **Waived for internal beta only** by jacobcd123, 2026-08-12 (does not clear the production-go requirement).
-- [ ] OS sandbox availability and fail-closed behaviour have been checked in the target environment. **Waived for internal beta only** by jacobcd123, 2026-08-12 (does not clear the production-go requirement).
+- [ ] Live E2E has passed on a signed-in Claude Code installation. **Blocked on a Windows host** — candidate path `Z:` is not usable on this Linux checkout; re-run on the Windows host with `CLAUDE_MATTER_ROOTS` set to a real matter root. **Waived for internal beta only** by jacobcd123, 2026-08-12 (does not clear the production-go requirement). Record the production completion reference in `docs/operational-evidence-register.md`.
+- [ ] OS sandbox availability and fail-closed behaviour have been checked in the target environment. **Waived for internal beta only** by jacobcd123, 2026-08-12 (does not clear the production-go requirement). Record the production completion reference in `docs/operational-evidence-register.md`.
 - [ ] The hook installed path matches the command in the rendered settings file.
-- [ ] Transcript filing has been checked.
-- [ ] Manifest signature verification has been checked.
-- [x] Independent security review is complete, or a responsible principal has expressly waived it for an internal beta only. **Waived for internal beta only** by jacobcd123, 2026-08-12. Not a production go for external/client use.
+- [ ] Transcript filing has been checked. Record the production completion reference in `docs/operational-evidence-register.md`.
+- [ ] Manifest signature verification has been checked. Record the production completion reference in `docs/operational-evidence-register.md`.
+- [x] Independent security review is complete, or a responsible principal has expressly waived it for an internal beta only. **Waived for internal beta only** by jacobcd123, 2026-08-12. Not a production go for external/client use. Record any production completion reference in `docs/operational-evidence-register.md`.
 - [x] The expert-report mismatch has been resolved or expressly accepted as a documented policy decision by the adopting practice. **Resolved — Option A (strict prohibition), 2026-08-12** (see `docs/policy-decisions/expert-report-rule.md`).
 - [x] The deployment owner and rollback owner are named: **jacobcd123** (both roles).
 - [ ] The version compatibility range has been reviewed and updated.

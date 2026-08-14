@@ -56,7 +56,12 @@ PLACEHOLDER_TOKENS = ("REPLACE-WITH",)
 ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 URL_PREFIX_RE = re.compile(r"^https?://")
 PLACEHOLDER_MARKERS = (
-    "REPLACE-WITH", "OWNER-REQUIRED", "DATE-REQUIRED", "EVIDENCE-REQUIRED", "PENDING",
+    "REPLACE-WITH",
+    "OWNER-REQUIRED",
+    "DATE-REQUIRED",
+    "EVIDENCE-REQUIRED",
+    "EVIDENCE-REFERENCE-REQUIRED",
+    "PENDING",
 )
 
 
@@ -249,6 +254,54 @@ def _validate_data_flow_model(text: str) -> list[str]:
     return issues
 
 
+EXPECTED_OPERATIONAL_GATES = (
+    "`claude doctor` on each supported platform",
+    "`/status` in a real session",
+    "Live E2E (`CLAUDE_E2E=1 node tests/e2e.test.js`)",
+    "Cross-matter refusal smoke test",
+    "Sandbox fail-closed check",
+    "`SessionEnd` transcript filing check",
+    "Native Windows platform exclusion",
+    "Manifest signature verification",
+    "Version compatibility review",
+    "OS-isolation acceptance",
+    "Records-service confirmation",
+    "Independent security review",
+)
+
+
+def _validate_operational_evidence_register(text: str) -> list[str]:
+    """Every operational gate must have an owner, ISO date and evidence reference."""
+    rows = _parse_markdown_table(text)
+    if not rows:
+        return ["operational evidence register has no table rows"]
+
+    issues: list[str] = []
+    seen: set[str] = set()
+    expected = set(EXPECTED_OPERATIONAL_GATES)
+    for i, row in enumerate(rows):
+        if len(row) < 6:
+            issues.append(f"operational evidence register row {i + 1} has too few columns")
+            continue
+        gate, owner, date, evidence = row[0], row[3], row[4], row[5]
+        if gate in seen:
+            issues.append(f"operational evidence register gate {gate!r} is duplicated")
+        seen.add(gate)
+        if gate not in expected:
+            issues.append(f"operational evidence register gate {gate!r} is unexpected")
+        if not owner or _is_register_placeholder(owner):
+            issues.append(f"operational evidence register row {i + 1} owner is unresolved")
+        if not ISO_DATE_RE.match(date):
+            issues.append(f"operational evidence register row {i + 1} date is not an ISO date")
+        if not evidence or _is_register_placeholder(evidence):
+            issues.append(f"operational evidence register row {i + 1} evidence reference is unresolved")
+
+    for gate in EXPECTED_OPERATIONAL_GATES:
+        if gate not in seen:
+            issues.append(f"operational evidence register missing gate: {gate}")
+    return issues
+
+
 # Governance registers whose resolution is a release precondition. Each entry
 # is (path relative to repo root, validator that returns issue strings when
 # unresolved). Validators check *positively* for named owners, ISO dates and
@@ -258,6 +311,7 @@ GOVERNANCE_REGISTERS: list[tuple[str, Any]] = [
     ("docs/supplier-evidence-register.md", _validate_supplier_evidence_register),
     ("docs/legal-source-register.md", _validate_legal_source_register),
     ("docs/data-flow-model.md", _validate_data_flow_model),
+    ("docs/operational-evidence-register.md", _validate_operational_evidence_register),
     ("docs/policy-decisions/oauth-token-management.md", _validate_oauth_token_management),
 ]
 

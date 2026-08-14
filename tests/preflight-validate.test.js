@@ -57,6 +57,10 @@ function copyRegisters(destDir) {
     path.join(REGISTER_DIR, 'data-flow-model.md'),
     path.join(target, 'data-flow-model.md')
   );
+  fs.copyFileSync(
+    path.join(REGISTER_DIR, 'operational-evidence-register.md'),
+    path.join(target, 'operational-evidence-register.md')
+  );
 }
 
 function run(args, env) {
@@ -328,7 +332,7 @@ const t46 = run(['--mode', 'production', prodNoVersionPath]);
 check('46 production mode rejects missing requiredMinimumVersion', t46.code, 1);
 check('47 production mode reports version error', t46.stdout.includes('requiredMinimumVersion is missing'), true);
 
-// 48: production mode rejects unresolved governance register
+// 48-49: production mode rejects unresolved governance registers
 const prodUnresolved = prodBase();
 // Write into a fresh dir with the repo-root (unresolved) registers by NOT
 // copying the resolved test-fixtures docs.
@@ -339,6 +343,64 @@ fs.writeFileSync(prodUnresolvedPath, JSON.stringify(prodUnresolved, null, 2) + '
 const t48 = run(['--mode', 'production', prodUnresolvedPath]);
 check('48 production mode rejects unresolved register', t48.code, 1);
 check('49 production mode reports register error', t48.stdout.includes('governance register unresolved'), true);
+
+// 50-53: operational evidence placeholders block production but only warn in
+// template mode. A resolved synthetic fixture remains the production happy path.
+const operationalPlaceholderDir = path.join(TMP, 'operational-placeholder');
+const operationalPlaceholderPath = write(
+  path.join('operational-placeholder', 'settings.json'),
+  prodBase(),
+  true
+);
+const operationalRegister = path.join(
+  operationalPlaceholderDir,
+  'docs',
+  'operational-evidence-register.md'
+);
+fs.writeFileSync(
+  operationalRegister,
+  fs.readFileSync(path.join(REPO_ROOT, 'docs', 'operational-evidence-register.md'))
+);
+const t50 = run(['--mode', 'production', operationalPlaceholderPath]);
+check('50 production mode rejects operational evidence placeholders', t50.code, 1);
+check(
+  '51 production mode names operational evidence register',
+  t50.stdout.includes('docs/operational-evidence-register.md'),
+  true
+);
+const t52 = run(['--mode', 'template', operationalPlaceholderPath]);
+check('52 template mode accepts operational evidence placeholders', t52.code, 0);
+check(
+  '53 template mode warns on operational evidence register',
+  t52.stdout.includes('docs/operational-evidence-register.md'),
+  true
+);
+
+// 54-55: deleting a required operational gate must not satisfy production mode.
+const operationalMissingDir = path.join(TMP, 'operational-missing-gate');
+const operationalMissingPath = write(
+  path.join('operational-missing-gate', 'settings.json'),
+  prodBase(),
+  true
+);
+const operationalMissingRegister = path.join(
+  operationalMissingDir,
+  'docs',
+  'operational-evidence-register.md'
+);
+const missingGateText = fs
+  .readFileSync(path.join(REGISTER_DIR, 'operational-evidence-register.md'), 'utf8')
+  .split('\n')
+  .filter((line) => !line.includes('Independent security review'))
+  .join('\n');
+fs.writeFileSync(operationalMissingRegister, missingGateText);
+const t54 = run(['--mode', 'production', operationalMissingPath]);
+check('54 production mode rejects missing operational evidence gate', t54.code, 1);
+check(
+  '55 production mode reports missing operational evidence gate',
+  t54.stdout.includes('operational evidence register missing gate'),
+  true
+);
 
 // ---- OAuth governance register: scope-aware, positive field validation -----
 
@@ -586,42 +648,42 @@ check(
 
 // ---- quiet flag --------------------------------------------------------------
 
-// 50-51: quiet flag suppresses warnings and notes
-const t50 = run(['--mode', 'template', '--quiet', templatePath]);
-check('50 quiet flag suppresses warnings', !t50.stdout.includes('WARNING:'), true);
-check('51 quiet flag still passes', t50.code, 0);
+// 80-81: quiet flag suppresses warnings and notes
+const tQuietTemplate = run(['--mode', 'template', '--quiet', templatePath]);
+check('80 quiet flag suppresses warnings', !tQuietTemplate.stdout.includes('WARNING:'), true);
+check('81 quiet flag still passes', tQuietTemplate.code, 0);
 
-// 52: quiet flag suppresses note in production mode
-const t52 = run(['--mode', 'production', '--quiet', prodGoodPath]);
-check('52 quiet flag suppresses production note', !t52.stdout.includes('engineering readiness gate'), true);
+// 82: quiet flag suppresses note in production mode
+const tQuietProduction = run(['--mode', 'production', '--quiet', prodGoodPath]);
+check('82 quiet flag suppresses production note', !tQuietProduction.stdout.includes('engineering readiness gate'), true);
 
-// 53: production mode reports a note without quiet
-const t53 = run(['--mode', 'production', prodGoodPath]);
-check('53 production mode reports note without quiet', t53.stdout.includes('engineering readiness gate'), true);
+// 83: production mode reports a note without quiet
+const tProductionNote = run(['--mode', 'production', prodGoodPath]);
+check('83 production mode reports note without quiet', tProductionNote.stdout.includes('engineering readiness gate'), true);
 
 // ---- committed template / synthetic fixture ---------------------------------
 
-// 54: committed managed-settings.json passes template mode
-const t54 = run(['--mode', 'template', path.join(REPO_ROOT, 'managed-settings.json')]);
-check('54 committed template passes template mode', t54.code, 0);
+// 84: committed managed-settings.json passes template mode
+const tCommittedTemplate = run(['--mode', 'template', path.join(REPO_ROOT, 'managed-settings.json')]);
+check('84 committed template passes template mode', tCommittedTemplate.code, 0);
 
-// 55: committed template fails production mode (placeholders present)
-const t55 = run(['--mode', 'production', path.join(REPO_ROOT, 'managed-settings.json')]);
-check('55 committed template fails production mode', t55.code, 1);
+// 85: committed template fails production mode (placeholders present)
+const tCommittedProduction = run(['--mode', 'production', path.join(REPO_ROOT, 'managed-settings.json')]);
+check('85 committed template fails production mode', tCommittedProduction.code, 1);
 
-// 56: committed synthetic-production.json passes production mode
-const t56 = run([
+// 86: committed synthetic-production.json passes production mode
+const tSyntheticProduction = run([
   '--mode', 'production', path.join(REPO_ROOT, 'test-fixtures', 'synthetic-production.json'),
 ]);
-check('56 synthetic fixture passes production mode', t56.code, 0);
+check('86 synthetic fixture passes production mode', tSyntheticProduction.code, 0);
 
-// 57: mutation test rejects an invalid non-placeholder root
+// 87: mutation test rejects an invalid non-placeholder root
 const prodBadRoot = prodBase();
 prodBadRoot.env.CLAUDE_MATTER_ROOTS = 'relative-matter-root';
 const prodBadRootPath = write('prod-bad-root.json', prodBadRoot, true);
-const t57 = run(['--mode', 'production', prodBadRootPath]);
-check('57 production mode rejects invalid root', t57.code, 1);
-check('58 production mode reports invalid root', t57.stdout.includes('CLAUDE_MATTER_ROOTS root is not an absolute POSIX path'), true);
+const tBadRoot = run(['--mode', 'production', prodBadRootPath]);
+check('87 production mode rejects invalid root', tBadRoot.code, 1);
+check('88 production mode reports invalid root', tBadRoot.stdout.includes('CLAUDE_MATTER_ROOTS root is not an absolute POSIX path'), true);
 
 // ---- cleanup ----------------------------------------------------------------
 fs.rmSync(TMP, { recursive: true, force: true });
