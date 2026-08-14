@@ -122,14 +122,52 @@ def _validate_expert_report_rule(text: str) -> list[str]:
     return []
 
 
-def _validate_oauth_token_management(text: str) -> list[str]:
-    """Status must say APPROVED, not merely fail to say PENDING."""
+def _find_decision_field(text: str, label: str) -> str:
+    """Return a decision-record bullet value by label."""
+    pattern = re.compile(rf"^-\s+(?:\*\*)?{re.escape(label)}(?:\*\*)?:\s*(.+)$", re.MULTILINE)
+    match = pattern.search(text)
+    return match.group(1).strip() if match else ""
+
+
+def _validate_oauth_token_management(text: str, mode: str) -> list[str]:
+    """Static-token exceptions must be scope-aware and positively recorded."""
     status = _find_status(text)
     if not status:
         return ["oauth-token-management has no status line"]
-    if "APPROVED" not in status.upper():
+    # Require a positive leading APPROVED word. Substring checks would accept
+    # "NOT APPROVED" and "UNAPPROVED".
+    if not re.match(r"(?i)^\s*APPROVED\b", status):
         return [f"oauth-token-management status is not APPROVED: {status!r}"]
-    return []
+    if mode == "production" and "INTERNAL BETA" in status.upper():
+        return [f"oauth-token-management status is not approved for production: {status!r}"]
+
+    required_fields = (
+        "Decision",
+        "Decided by",
+        "Date",
+        "Rationale",
+        "Token owner",
+        "Storage location",
+        "Minimum permissions",
+        "Rotation interval",
+        "Last rotated",
+        "Next rotation due",
+        "Emergency revocation procedure",
+        "Monitoring owner",
+        "Migration trigger",
+    )
+    issues: list[str] = []
+    for field in required_fields:
+        value = _find_decision_field(text, field)
+        if not value or _is_register_placeholder(value):
+            issues.append(f"oauth-token-management field {field!r} is unresolved")
+
+    if mode == "production":
+        for field in ("Date", "Last rotated", "Next rotation due"):
+            value = _find_decision_field(text, field)
+            if value and not ISO_DATE_RE.search(value):
+                issues.append(f"oauth-token-management field {field!r} has no ISO date")
+    return issues
 
 
 def _validate_supplier_evidence_register(text: str) -> list[str]:
@@ -296,7 +334,10 @@ def check_governance_registers(
                 warnings.append(msg)
             continue
         text = full.read_text(encoding="utf-8")
-        issues = validator(text)
+        if rel_path == "docs/policy-decisions/oauth-token-management.md":
+            issues = validator(text, mode)
+        else:
+            issues = validator(text)
         if issues:
             for issue in issues:
                 msg = f"governance register unresolved: {rel_path} — {issue}"

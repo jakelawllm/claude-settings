@@ -340,6 +340,130 @@ const t48 = run(['--mode', 'production', prodUnresolvedPath]);
 check('48 production mode rejects unresolved register', t48.code, 1);
 check('49 production mode reports register error', t48.stdout.includes('governance register unresolved'), true);
 
+// ---- OAuth governance register: scope-aware, positive field validation -----
+
+function writeOauthDoc(dir, content) {
+  const target = path.join(dir, 'docs', 'policy-decisions', 'oauth-token-management.md');
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, content);
+}
+
+const OAUTH_COMPLETE_PROD = `# Policy decision: OAuth token management for Claude workflows
+
+## Status
+
+APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE
+
+## Decision record
+
+- Decision: Option B — synthetic static-token exception
+- Decided by: Synthetic Test Owner
+- Date: 2026-08-04
+- Rationale: Synthetic production validator fixture only.
+- Token owner: Synthetic Test Owner
+- Storage location: synthetic GitHub Actions repository secret name only
+- Minimum permissions: contents, pull-requests, issues and actions: read
+- Rotation interval: 90 days
+- Last rotated: 2026-08-04
+- Next rotation due: 2026-11-02
+- Emergency revocation procedure: synthetic issuer revocation procedure
+- Monitoring owner: Synthetic Test Owner
+- Migration trigger: synthetic federation setup approved
+`;
+
+// 60: production mode rejects an internal-beta-only OAuth status even when
+// every operational field is filled — beta approval must never satisfy a
+// production gate.
+const prodOauthBeta = prodBase();
+const prodOauthBetaDir = path.join(TMP, 'oauth-beta');
+const prodOauthBetaPath = write(path.join('oauth-beta', 'settings.json'), prodOauthBeta, true);
+writeOauthDoc(
+  prodOauthBetaDir,
+  OAUTH_COMPLETE_PROD.replace(
+    'APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE',
+    'APPROVED FOR INTERNAL BETA ONLY — synthetic'
+  )
+);
+const t60 = run(['--mode', 'production', prodOauthBetaPath]);
+check('60 production mode rejects internal-beta-only OAuth status', t60.code, 1);
+check(
+  '61 production mode reports OAuth status not approved for production',
+  t60.stdout.includes('oauth-token-management status is not approved for production'),
+  true
+);
+
+// 62: a negative status containing the word APPROVED must not pass.
+const prodOauthNegative = prodBase();
+const prodOauthNegativeDir = path.join(TMP, 'oauth-negative-status');
+const prodOauthNegativePath = write(
+  path.join('oauth-negative-status', 'settings.json'),
+  prodOauthNegative,
+  true
+);
+writeOauthDoc(
+  prodOauthNegativeDir,
+  OAUTH_COMPLETE_PROD.replace(
+    'APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE',
+    'NOT APPROVED — synthetic'
+  )
+);
+const t62 = run(['--mode', 'production', prodOauthNegativePath]);
+check('62 production mode rejects negative OAuth status', t62.code, 1);
+check(
+  '63 production mode reports negative OAuth status',
+  t62.stdout.includes('oauth-token-management status is not APPROVED'),
+  true
+);
+
+// 64: production mode rejects an OAuth doc missing a required Option B field.
+const prodOauthMissingField = prodBase();
+const prodOauthMissingDir = path.join(TMP, 'oauth-missing-field');
+const prodOauthMissingPath = write(
+  path.join('oauth-missing-field', 'settings.json'),
+  prodOauthMissingField,
+  true
+);
+writeOauthDoc(
+  prodOauthMissingDir,
+  OAUTH_COMPLETE_PROD.replace('- Monitoring owner: Synthetic Test Owner\n', '')
+);
+const t64 = run(['--mode', 'production', prodOauthMissingPath]);
+check('64 production mode rejects OAuth doc missing a required field', t64.code, 1);
+check(
+  "65 production mode reports OAuth field 'Monitoring owner' unresolved",
+  t64.stdout.includes(`oauth-token-management field 'Monitoring owner' is unresolved`),
+  true
+);
+
+// 66: production mode rejects an OAuth doc with a PENDING required field.
+const prodOauthPendingField = prodBase();
+const prodOauthPendingDir = path.join(TMP, 'oauth-pending-field');
+const prodOauthPendingPath = write(
+  path.join('oauth-pending-field', 'settings.json'),
+  prodOauthPendingField,
+  true
+);
+writeOauthDoc(
+  prodOauthPendingDir,
+  OAUTH_COMPLETE_PROD.replace('Synthetic federation setup approved', 'PENDING').replace(
+    'synthetic federation setup approved',
+    'PENDING'
+  )
+);
+const t66 = run(['--mode', 'production', prodOauthPendingPath]);
+check('66 production mode rejects OAuth doc with a PENDING field', t66.code, 1);
+check(
+  "67 production mode reports OAuth field 'Migration trigger' unresolved",
+  t66.stdout.includes(`oauth-token-management field 'Migration trigger' is unresolved`),
+  true
+);
+
+// 68: template mode still accepts the repository's real internal-beta-only
+// OAuth decision — beta scope is a warning gate, not a hard failure, until
+// production mode is requested.
+const t68 = run(['--mode', 'template', path.join(REPO_ROOT, 'managed-settings.json')]);
+check('68 template mode still passes with internal-beta OAuth status', t68.code, 0);
+
 // ---- quiet flag --------------------------------------------------------------
 
 // 50-51: quiet flag suppresses warnings and notes
