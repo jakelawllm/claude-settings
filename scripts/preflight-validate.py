@@ -39,10 +39,12 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import pathlib
 import platform
 import re
+import subprocess
 import sys
 from typing import Any
 from urllib.parse import urlsplit
@@ -152,9 +154,10 @@ def _validate_expert_report_rule(text: str) -> list[str]:
 
 def _find_decision_field(text: str, label: str) -> str:
     """Return a decision-record bullet value by label."""
-    pattern = re.compile(rf"^-\s+(?:\*\*)?{re.escape(label)}(?:\*\*)?:\s*(.+)$", re.MULTILINE)
-    match = pattern.search(text)
-    return match.group(1).strip() if match else ""
+    escaped = re.escape(label)
+    pattern = re.compile(rf"^-[ \t]+(?:\*\*{escaped}:\*\*|\*\*{escaped}\*\*:|{escaped}:)[ \t]*(.+)$", re.MULTILINE)
+    matches = pattern.findall(text)
+    return matches[0].strip() if len(matches) == 1 else ""
 
 
 def _utc_today() -> dt.date:
@@ -179,8 +182,57 @@ def _review_date_issues(completed: str, due: str, label: str, assessment_date: d
     return issues
 
 
+def _validate_disabled_workflow(text: str, assessment_date: dt.date) -> list[str]:
+    """Validate a current, explicit remote-disablement observation.
+
+    This verifies the record and local artifact, not live GitHub state. Operators
+    must re-query the named API before recording today's observation. Missing
+    credentials or an unset enable variable never satisfy this disposition.
+    """
+    issues: list[str] = []
+    required_fields = ("Workflow state", "Workflow path", "Workflow ID", "Repository",
+                       "Workflow SHA-256 (LF)", "Evidence source", "Observed by", "Verified date")
+    fields = {label: _find_decision_field(text, label) for label in required_fields}
+    for label, value in fields.items():
+        if not value or _is_register_placeholder(value):
+            issues.append(f"disabled workflow field {label!r} is unresolved")
+    if fields["Workflow state"] != "disabled_manually":
+        issues.append("disabled workflow requires an observed disabled_manually state")
+    if fields["Workflow path"] != ".github/workflows/claude.yml":
+        issues.append("disabled workflow path must be .github/workflows/claude.yml")
+    if not re.fullmatch(r"[1-9][0-9]*", fields["Workflow ID"]):
+        issues.append("disabled workflow ID must be a positive integer")
+    if fields["Verified date"] != assessment_date.isoformat():
+        issues.append("disabled workflow observation must be rechecked on the current UTC assessment date")
+    try:
+        remote = subprocess.run(["git", "config", "--get", "remote.origin.url"], cwd=REPO_ROOT,
+                                capture_output=True, text=True, check=True, timeout=5).stdout.strip()
+        match = re.fullmatch(r"(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)([^/]+/[^/]+?)(?:\.git)?", remote)
+        if not match or fields["Repository"] != match.group(1):
+            issues.append("disabled workflow repository does not match this checkout's GitHub origin")
+    except (OSError, subprocess.SubprocessError):
+        issues.append("disabled workflow repository identity could not be checked against git origin")
+    expected_source = f"https://api.github.com/repos/{fields['Repository']}/actions/workflows/claude.yml"
+    if fields["Evidence source"] != expected_source:
+        issues.append("disabled workflow evidence source must identify this workflow's GitHub API endpoint")
+    try:
+        workflow = (REPO_ROOT / ".github/workflows/claude.yml").read_bytes().replace(b"\r\n", b"\n")
+        if fields["Workflow SHA-256 (LF)"] != hashlib.sha256(workflow).hexdigest():
+            issues.append("disabled workflow hash does not match the current workflow; repeat the disablement review")
+    except OSError:
+        issues.append("disabled workflow artifact is unreadable")
+    return issues
+
+
 def _validate_oauth_token_management(text: str, mode: str, assessment_date: dt.date | None = None) -> list[str]:
     """Static-token exceptions must be scope-aware and positively recorded."""
+    current = re.findall(r"^### Current workflow disposition\s*\n(.*?)(?=^#{1,3} |\Z)", text, re.MULTILINE | re.DOTALL)
+    if len(current) > 1:
+        return ["oauth-token-management current workflow disposition is duplicated"]
+    if current:
+        text = current[0]
+        if _find_status(text) == "DISABLED":
+            return _validate_disabled_workflow(text, assessment_date or _utc_today())
     status = _find_status(text)
     if not status:
         return ["oauth-token-management has no status line"]

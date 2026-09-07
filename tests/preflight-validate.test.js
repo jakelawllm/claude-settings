@@ -23,6 +23,7 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { createHash } = require('crypto');
 
 const { UTC_DAY, shiftedDate, dateFixture, copyEvidence } = require('./synthetic-evidence');
 
@@ -762,6 +763,62 @@ for (const [label, register, change, expected] of [
   check(`${label} rejected`, result.code, 1);
   check(`${label} identified`, result.stdout.includes(expected), true);
 }
+// Disabling an optional integration needs a positive, current observation;
+// absent secrets or variables never replace the active credential gate.
+const workflowDigest = createHash('sha256').update(fs.readFileSync(path.join(REPO_ROOT,
+  '.github/workflows/claude.yml'), 'utf8').replace(/\r\n/g, '\n')).digest('hex');
+const workflowOrigin = spawnSync('git', ['config', '--get', 'remote.origin.url'],
+  { cwd: REPO_ROOT, encoding: 'utf8' }).stdout.trim();
+const workflowRepository = workflowOrigin.replace(/^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)/, '').replace(/\.git$/, '');
+const disabledObservation = `### Current workflow disposition
+
+Status: DISABLED
+
+- Workflow state: disabled_manually
+- Workflow path: .github/workflows/claude.yml
+- Workflow ID: 322652643
+- Repository: ${workflowRepository}
+- Workflow SHA-256 (LF): ${workflowDigest}
+- Evidence source: https://api.github.com/repos/${workflowRepository}/actions/workflows/claude.yml
+- Observed by: Synthetic test observer
+- Verified date: ${UTC_DAY}
+
+### Refresh before release
+
+Historical text below this boundary must not supply missing current fields.
+`;
+function disabledResult(label, observation) {
+  const fixture = write(`workflow-${label}/settings.json`, prodBase(), true);
+  writeOauthDoc(path.dirname(fixture), `# OAuth history\n\nStatus: APPROVED FOR INTERNAL BETA ONLY\n\n- Last rotated: never rotated\n- Next rotation due: 2020-01-01\n\n${observation}`);
+  return run(['--mode', 'production', fixture]);
+}
+const disabledGood = disabledResult('current', disabledObservation);
+check('current explicit disabled workflow releases optional token gate', disabledGood.code, productionExit);
+check('disabled workflow has no unrelated errors', (disabledGood.stdout.match(/^ERROR:/gm) || []).length, productionExit);
+for (const [label, change, expected] of [
+  ['active state', t => t.replace('Workflow state: disabled_manually', 'Workflow state: active'), 'observed disabled_manually state'],
+  ['wrong path', t => t.replace('Workflow path: .github/workflows/claude.yml', 'Workflow path: .github/workflows/ci.yml'), 'workflow path must be'],
+  ['wrong ID', t => t.replace('Workflow ID: 322652643', 'Workflow ID: not-a-number'), 'ID must be a positive integer'],
+  ['wrong repository', t => t.replace(`Repository: ${workflowRepository}`, 'Repository: synthetic/unrelated'), 'does not match this checkout'],
+  ['wrong source', t => t.replace('Evidence source: https://api.github.com/', 'Evidence source: https://unrelated.example.invalid/'), 'must identify this workflow'],
+  ['stale hash', t => t.replace(workflowDigest, '0'.repeat(64)), 'hash does not match'],
+  ['old observation', t => t.replace(`Verified date: ${UTC_DAY}`, `Verified date: ${shiftedDate(-1)}`), 'current UTC assessment date'],
+  ['future observation', t => t.replace(`Verified date: ${UTC_DAY}`, `Verified date: ${shiftedDate(7)}`), 'current UTC assessment date'],
+  ['missing observer', t => t.replace('- Observed by: Synthetic test observer\n', ''), "field 'Observed by' is unresolved"],
+  ['blank observer', t => t.replace('Observed by: Synthetic test observer', 'Observed by:'), "field 'Observed by' is unresolved"],
+  ['placeholder source', t => t.replace('Observed by: Synthetic test observer', 'Observed by: PENDING'), "field 'Observed by' is unresolved"],
+  ['duplicate field', t => t.replace('- Workflow state: disabled_manually', '- Workflow state: disabled_manually\n- Workflow state: active'), "field 'Workflow state' is unresolved"],
+  ['missing status', t => t.replace('Status: DISABLED', ''), 'has no status line'],
+  ['duplicate section', t => t + t, 'current workflow disposition is duplicated'],
+]) {
+  const result = disabledResult(label, change(disabledObservation));
+  check(`disabled ${label} rejected`, result.code, 1);
+  check(`disabled ${label} identified`, result.stdout.includes(expected), true);
+}
+const activeCurrent = disabledResult('active approved', `### Current workflow disposition\n\nStatus: APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE\n\n${OAUTH_DECISION_RECORD.replace('## Decision record', '#### Decision record')}`);
+check('current approved credentials still support active workflow', (activeCurrent.stdout.match(/^ERROR:/gm) || []).length, productionExit);
+const boldCurrent = disabledResult('bold labels', disabledObservation.replace(/^- ([^:\n]+): /gm, '- **$1:** '));
+check('standard bold decision fields parse without bypass', (boldCurrent.stdout.match(/^ERROR:/gm) || []).length, productionExit);
 // Pin the clock internally for deterministic boundary tests; there is no CLI
 // clock override that could make an expired production approval look current.
 const dateBoundaries = spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), ['-c', `

@@ -84,6 +84,32 @@ SUP-05 static-token exception is complete for internal beta. Production go for e
 
 The historical Option B approval and rotation dates above are preserved. They do not establish that rotation happened. The recorded first rotation date has passed and the record still says never rotated.
 
-The current workflow is disabled unless ENABLE_CLAUDE_WORKFLOW=true is explicitly set, restricts invocations to trusted associations and verifies actual repository write permission before checkout. Unused id-token: write was removed. The action receives the explicit read-only github.token and a fixed analysis prompt; findings appear in action output, not an interactive write-capable comment workflow. Before enabling this optional workflow, the token owner must perform issuer-side revocation/rotation, update Last rotated and Next rotation due, and test the replacement without exposing it. Offline verification and locally authenticated CLI tests do not depend on this workflow.
+The optional live GitHub workflow was manually disabled on 2026-09-07 and the API observation is recorded below. The candidate workflow also requires ENABLE_CLAUDE_WORKFLOW=true, restricts invocations to trusted associations and verifies actual repository write permission before checkout. Unused id-token: write was removed. The action receives the explicit read-only github.token and a fixed analysis prompt; findings appear in action output, not an interactive write-capable comment workflow. Before enabling this optional workflow, the token owner must perform issuer-side revocation/rotation, record a complete current approved credential disposition including Last rotated and Next rotation due, and test the replacement without exposing it. Offline verification and locally authenticated CLI tests do not depend on this workflow.
 
 The current engineering assessment is [INTERNAL_MVP_READINESS_REPORT.md](../INTERNAL_MVP_READINESS_REPORT.md). This addendum supersedes statements above that the current workflow is unchanged or that filled fields prove an operationally current exception.
+
+### Current workflow disposition
+
+Status: DISABLED
+
+- Workflow state: disabled_manually
+- Workflow path: .github/workflows/claude.yml
+- Workflow ID: 322652643
+- Repository: jakelawllm/claude-settings
+- Workflow SHA-256 (LF): 649d3a459ff0e903e237d9a8924927344be095d58ac2681cce914149ee0aeb90
+- Evidence source: https://api.github.com/repos/jakelawllm/claude-settings/actions/workflows/claude.yml
+- Observed by: Authenticated repository-maintainer tooling during internal-MVP review
+- Verified date: 2026-09-07
+
+This records observed remote disablement, not principal approval, token rotation or issuer-side revocation. It makes no assumption about inherited organisation variables or absent credentials. The workflow hash binds this review to the candidate checkout after CRLF-to-LF normalization. Production preflight accepts this disposition only on the recorded UTC date and for the matching GitHub origin and workflow artifact. It checks the record locally; it does not query GitHub or prove that remote state has remained unchanged.
+
+### Refresh before release
+
+Immediately before production preflight, an authenticated repository maintainer must query the current state without reading secrets:
+
+```sh
+gh api repos/jakelawllm/claude-settings/actions/workflows/claude.yml --jq '{id,name,state,path}'
+python -c "import hashlib,pathlib; print(hashlib.sha256(pathlib.Path('.github/workflows/claude.yml').read_bytes().replace(b'\r\n', b'\n')).hexdigest())"
+```
+
+Confirm ID 322652643, path .github/workflows/claude.yml and state disabled_manually. Review any workflow changes, then update the observed-by field, UTC verified date and local normalized hash above. Rerun production preflight against the real evidence root. Do not renew this observation when the API is unavailable or reports an active workflow. In that case deliberately disable and recheck the optional workflow, or replace the current disposition with a complete approved credential record before enabling it. Missing secrets or an unset enable variable are not disablement evidence. Re-enabling later also requires the explicit repository opt-in described in the workflow documentation; this record does not authorize that action.
