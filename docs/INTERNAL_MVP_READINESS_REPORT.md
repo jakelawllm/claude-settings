@@ -160,7 +160,26 @@ Commands were run from the repository root with the hash-installed Python 3.12 e
 | OSV `POST https://api.osv.dev/v1/querybatch` with installed public PyPI package/version pairs from `python -m pip list --format=json` | 19 packages checked; 0 known advisory matches on 2026-09-07. Separate accessible GitHub Dependabot alerts list was empty. These are dated database observations, not a guarantee of unknown-vulnerability absence. |
 | LibreOffice PDF conversion and visual review | Both DOCX rendered; 31/30 pages; no text outside page bounds. Contents/table pagination corrected. |
 | `python scripts/preflight-validate.py --mode production dist/managed-settings.production.json` with real repository governance | Expected refusal, exit 1 with 77 errors on Windows: 3 absent installed hook paths, 1 unsupported host and 73 unresolved governance fields. The explicitly recorded disabled OAuth workflow is accepted on the verified date; missing client approvals remain blocked. |
-| Final pushed CI | Pending delivery; consult the PR checks for the final commit. |
+| Pushed delivery CI at `345fb82` | [CI run 34076719893](https://github.com/jakelawllm/claude-settings/actions/runs/34076719893): all 5 required jobs passed (Linux/macOS/Windows hook checks, settings/policy and secret scan). The final documentation commit is checked again in [PR #23](https://github.com/jakelawllm/claude-settings/pull/23). |
+| Additional GitHub checks | Both [CodeQL code-quality analyses](https://github.com/jakelawllm/claude-settings/actions/runs/34076718572) completed successfully. The security-alert API returned 404/no analysis for this PR, so no zero-alert claim is made from that API. Optional Cursor Bugbot could not run because its user/team usage limit was reached; it reported neutral with no annotations. It is not a required gate or prerequisite for the internal test. |
+
+Final offline assertion breakdown (each command prefixed with `node tests/`):
+
+| Command suffix | Windows passed | Linux passed | Failed |
+|---|---:|---:|---:|
+| `compliance-evaluation.test.js` | 15 | 15 | 0 |
+| `docs-control-claims.test.js` | 16 | 16 | 0 |
+| `docx-to-md.test.js` | 15 | 15 | 0 |
+| `e2e-harness.test.js` | 12 | 12 | 0 |
+| `generate-matter-sandbox.test.js` | 63 | 63 | 0 |
+| `generate-release-manifest.test.js` | 31 | 31 | 0 |
+| `matter-guard.test.js` | 127 | 132 | 0 |
+| `preflight-validate.test.js` | 229 | 229 | 0 |
+| `records-schema.test.js` | 12 | 12 | 0 |
+| `render-production-settings.test.js` | 102 | 103 | 0 |
+| `scan-docx-xml.test.js` | 30 | 30 | 0 |
+| `scan-history.test.js` | 60 | 60 | 0 |
+| **Total** | **712** | **718** | **0** |
 
 The mandatory suite covers configuration, subprocess errors, state persistence across processes, records retrieval, concurrency, archive failure/retry and release CLI integration. Native Windows necessarily skips POSIX-only filesystem cases; Linux executes them. Live model tests are optional in CI because they require an authenticated account and consume tokens. No database/migration, web UI, standalone formatter/linter/type-checker or compiled application exists; these checks are not reported as executed passes.
 
