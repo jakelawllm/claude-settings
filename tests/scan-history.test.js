@@ -72,6 +72,28 @@ function checkRejected(label, r) {
 }
 
 function run() {
+  const baseline = 'e25608d975ef58d31bd4ff7984eabb0622046b22';
+  const historical = '29e76ac949c47104185aee0ffa16569ea6a6c862';
+  for (const [name, filename, content, allowed] of [
+    ['report-baseline', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `**Baseline:** ${baseline}`, true],
+    ['report-historical', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `Historical commit ${historical}`, true],
+    ['checklist-baseline', 'docs/release-checklist.md', `Inherited from main at ${baseline}`, true],
+    ['unreviewed-document', 'docs/unreviewed.md', `Baseline ${baseline}`, false],
+    ['unreviewed-digest', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `Baseline ${'1'.repeat(40)}`, false],
+    ['adjacent-credential', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `Baseline ${baseline}; password="super-secret-value"`, false],
+    ['adjacent-entropy', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `Baseline ${baseline}; extra=${'2'.repeat(40)}`, false],
+    ['credential-shaped', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `github_pat_${baseline}`, false],
+  ]) {
+    const dir = path.join(TMP, 'reviewed-sha-' + name);
+    makeRepo(dir);
+    const target = path.join(dir, filename);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, content);
+    const opts = { cwd: dir, encoding: 'utf8' };
+    spawnSync('git', ['add', '-A'], opts);
+    spawnSync('git', ['commit', '-qm', 'reviewed reference regression'], opts);
+    (allowed ? checkAllowed : checkRejected)(`reviewed commit scope: ${name}`, scan(dir));
+  }
   for (const kind of ['filename', 'branch', 'tag']) {
     const dir = path.join(TMP, 'metadata-' + kind);
     makeRepo(dir);

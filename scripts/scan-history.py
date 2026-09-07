@@ -93,6 +93,15 @@ SHA40 = re.compile(r"^[0-9a-f]{40}$")
 RECORDS_HASH_PLACEHOLDER = re.compile(
     r"^aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899$"
 )
+# Reviewed public commits of this repository, cited by the dated readiness
+# evidence. The exception is limited to these values and document paths; it
+# never suppresses another value or a credential-shaped match on the same line.
+_REVIEW_BASELINE = "e25608d975ef58d31bd4" "ff7984eabb0622046b22"
+_HISTORICAL_ASSESSMENT = "29e76ac949c47104185a" "ee0ffa16569ea6a6c862"
+REVIEWED_COMMIT_REFS = {
+    "docs/INTERNAL_MVP_READINESS_REPORT.md": {_REVIEW_BASELINE, _HISTORICAL_ASSESSMENT},
+    "docs/release-checklist.md": {_REVIEW_BASELINE},
+}
 # GitHub auto-generates this exact commit-message line for the synthetic
 # refs/pull/N/merge ref used by pull_request-triggered CI. Both hex runs are
 # git commit SHAs the platform inserted, not credentials.
@@ -201,6 +210,8 @@ def match_is_allowed(filename, content, match, source="diff", label=""):
     The Dependabot URL allowance is scoped to commit messages only.
     """
     match_text = match.group(0)
+    if source == "diff" and label == ENTROPY_LABEL and match_text in REVIEWED_COMMIT_REFS.get(filename, set()):
+        return True
     if any(a.fullmatch(match_text) for a in ALLOW_MATCH):
         return True
     # These scanner regex source literals describe the synthetic NAS example;
