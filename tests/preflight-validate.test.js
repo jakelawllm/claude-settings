@@ -24,6 +24,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { UTC_DAY, shiftedDate, dateFixture, copyEvidence } = require('./synthetic-evidence');
+
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'preflight-validate.py');
 const REPO_ROOT = path.join(__dirname, '..');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'pv-'));
@@ -35,37 +37,12 @@ const HOOK = 'node "${REPO_ROOT}/hooks/matter-guard.js"';
 const REGISTER_DIR = path.join(REPO_ROOT, 'test-fixtures', 'docs');
 
 function copyRegisters(destDir) {
-  const target = path.join(destDir, 'docs');
-  fs.mkdirSync(path.join(target, 'policy-decisions'), { recursive: true });
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'supplier-evidence-register.md'),
-    path.join(target, 'supplier-evidence-register.md')
-  );
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'policy-decisions', 'expert-report-rule.md'),
-    path.join(target, 'policy-decisions', 'expert-report-rule.md')
-  );
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'policy-decisions', 'oauth-token-management.md'),
-    path.join(target, 'policy-decisions', 'oauth-token-management.md')
-  );
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'legal-source-register.md'),
-    path.join(target, 'legal-source-register.md')
-  );
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'data-flow-model.md'),
-    path.join(target, 'data-flow-model.md')
-  );
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'operational-evidence-register.md'),
-    path.join(target, 'operational-evidence-register.md')
-  );
+  if (!fs.existsSync(path.join(destDir, 'docs'))) copyEvidence(destDir);
 }
 
 function run(args, env) {
   const settingFile = [...args].reverse().find(a => a.endsWith('.json'));
-  if (settingFile && fs.existsSync(path.join(path.dirname(settingFile), 'docs'))) args = [...args, '--evidence-root', path.dirname(settingFile)];
+  if (!args.includes('--evidence-root') && settingFile && fs.existsSync(path.join(path.dirname(settingFile), 'docs'))) args = [...args, '--evidence-root', path.dirname(settingFile)];
   const r = spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), [SCRIPT, ...args], {
     encoding: 'utf8',
     env: env || process.env,
@@ -404,7 +381,7 @@ const missingGateText = fs
   .split('\n')
   .filter((line) => !line.includes('Independent security review'))
   .join('\n');
-fs.writeFileSync(operationalMissingRegister, missingGateText);
+fs.writeFileSync(operationalMissingRegister, dateFixture(missingGateText));
 const t54 = run(['--mode', 'production', operationalMissingPath]);
 check('54 production mode rejects missing operational evidence gate', t54.code, 1);
 check(
@@ -421,7 +398,7 @@ function writeOauthDoc(dir, content) {
   fs.writeFileSync(target, content);
 }
 
-const OAUTH_DECISION_RECORD = `## Decision record
+const OAUTH_DECISION_RECORD = dateFixture(`## Decision record
 
 - Decision: Option B â€” synthetic static-token exception
 - Decided by: Synthetic Test Owner
@@ -436,7 +413,7 @@ const OAUTH_DECISION_RECORD = `## Decision record
 - Emergency revocation procedure: synthetic issuer revocation procedure
 - Monitoring owner: Synthetic Test Owner
 - Migration trigger: synthetic federation setup approved
-`;
+`);
 
 const OAUTH_COMPLETE_PROD = `# Policy decision: OAuth token management for Claude workflows
 
@@ -683,8 +660,11 @@ const tCommittedProduction = run(['--mode', 'production', path.join(REPO_ROOT, '
 check('85 committed template fails production mode', tCommittedProduction.code, 1);
 
 // 86: committed synthetic-production.json passes production mode
+const relativeEvidenceRoot = path.join(TMP, 'current-synthetic-evidence');
+copyEvidence(relativeEvidenceRoot);
 const tSyntheticProduction = run([
   '--mode', 'production', path.join(REPO_ROOT, 'test-fixtures', 'synthetic-production.json'),
+  '--evidence-root', relativeEvidenceRoot,
 ]);
 check('86 synthetic fixture passes production mode', tSyntheticProduction.code, productionExit);
 
@@ -723,6 +703,8 @@ for (const [label, mutate, expected] of [
   ['version trailing junk', d => { d.requiredMaximumVersion = '2.1.300junk'; }, 'not a valid version'],
   ['inverted versions', d => { d.requiredMinimumVersion = '2.1.301'; }, 'exceeds requiredMaximumVersion'],
   ['empty HTTPS host', d => { d.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'https://'; }, 'must start with https://'],
+  ['OTLP query', d => { d.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'https://collector.example.invalid?synthetic=1'; }, 'must start with https://'],
+  ['OTLP signal endpoint', d => { d.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'https://collector.example.invalid/v1/traces'; }, 'must start with https://'],
 ]) {
   const fixture = prodBase();
   const returned = mutate(fixture);
@@ -738,7 +720,7 @@ const implicitEvidence = spawnSync(process.env.PYTHON || (process.platform === '
 check('adjacent synthetic evidence cannot shadow repository registers', implicitEvidence.stdout.includes('governance register unresolved'), true);
 const badDatePath = write('bad-date/settings.json', prodBase(), true);
 const badDateRegister = path.join(TMP, 'bad-date/docs/operational-evidence-register.md');
-fs.writeFileSync(badDateRegister, fs.readFileSync(badDateRegister, 'utf8').replace('2026-08-04', '2026-02-30'));
+fs.writeFileSync(badDateRegister, fs.readFileSync(badDateRegister, 'utf8').replace(shiftedDate(-1), '2026-02-30'));
 const badDate = run(['--mode', 'production', badDatePath]);
 check('impossible evidence date is rejected', badDate.stdout.includes('date is not an ISO date'), true);
 for (const [register, removed, expected] of [
@@ -754,6 +736,58 @@ const byteFailure = path.join(TMP, 'invalid-utf8.json');
 fs.writeFileSync(byteFailure, Buffer.from([0xff, 0xfe, 0xff]));
 const invalidUtf8 = run(['--mode', 'template', byteFailure]);
 check('invalid UTF-8 fails usefully', invalidUtf8.code === 1 && invalidUtf8.stdout.includes('ERROR:') && !invalidUtf8.stderr.includes('Traceback'), true);
+// Exercise currency/ordering through the CLI, whose clock always uses UTC now.
+for (const [label, register, change, expected] of [
+  ['supplier review expired', 'supplier-evidence-register.md', text => text.replace(shiftedDate(364), shiftedDate(-2)), 'review is overdue'],
+  ['legal review expired', 'legal-source-register.md', text => text.replace(shiftedDate(364), shiftedDate(-2)), 'review is overdue'],
+  ['supplier future verification', 'supplier-evidence-register.md', text => text.replace(shiftedDate(-1), shiftedDate(7)), 'completed date is in the future'],
+  ['legal future verification', 'legal-source-register.md', text => text.replace(shiftedDate(-1), shiftedDate(7)), 'completed date is in the future'],
+  ['supplier reverse review dates', 'supplier-evidence-register.md', text => text.replace(shiftedDate(-1), shiftedDate(3)).replace(shiftedDate(364), shiftedDate(2)), 'due date precedes its completed date'],
+  ['legal reverse review dates', 'legal-source-register.md', text => text.replace(shiftedDate(-1), shiftedDate(3)).replace(shiftedDate(364), shiftedDate(2)), 'due date precedes its completed date'],
+  ['token rotation overdue', 'policy-decisions/oauth-token-management.md', text => text.replace(shiftedDate(89), shiftedDate(-2)), 'rotation is overdue'],
+  ['token future rotation', 'policy-decisions/oauth-token-management.md', text => text.replace(`Last rotated: ${shiftedDate(-1)}`, `Last rotated: ${shiftedDate(7)}`), 'rotation completed date is in the future'],
+  ['token future approval', 'policy-decisions/oauth-token-management.md', text => text.replace(`Date: ${shiftedDate(-1)}`, `Date: ${shiftedDate(7)}`), 'approval date is in the future'],
+  ['token reverse rotation dates', 'policy-decisions/oauth-token-management.md', text => text.replace(`Last rotated: ${shiftedDate(-1)}`, `Last rotated: ${shiftedDate(3)}`).replace(shiftedDate(89), shiftedDate(2)), 'rotation due date precedes its completed date'],
+  ['future operational observation', 'operational-evidence-register.md', text => text.replace(shiftedDate(-1), shiftedDate(7)), 'date is in the future'],
+  ['future data-flow signoff', 'data-flow-model.md', text => text.replace(shiftedDate(-1), shiftedDate(7)), 'date is in the future'],
+  ['missing legal interpretation', 'legal-source-register.md', text => text.replace('Synthetic interpretation for tests.', ''), 'approved interpretation is unresolved'],
+  ['unapproved legal interpretation', 'legal-source-register.md', text => text.replace('Synthetic interpretation for tests.', 'NOT APPROVED'), 'approved interpretation is unresolved'],
+  ['placeholder supplier source URL', 'supplier-evidence-register.md', text => text.replace('https://docs.anthropic.com/en/legal/ai-data-policy', 'https://REPLACE-WITH-SOURCE'), 'source URL is not http(s)'],
+  ['empty supplier source host', 'supplier-evidence-register.md', text => text.replace('https://docs.anthropic.com/en/legal/ai-data-policy', 'https://'), 'source URL is not http(s)'],
+]) {
+  const fixture = write(`currency-${label}/settings.json`, prodBase(), true);
+  const evidence = path.join(path.dirname(fixture), 'docs', register);
+  fs.writeFileSync(evidence, change(fs.readFileSync(evidence, 'utf8')));
+  const result = run(['--mode', 'production', fixture]);
+  check(`${label} rejected`, result.code, 1);
+  check(`${label} identified`, result.stdout.includes(expected), true);
+}
+// Pin the clock internally for deterministic boundary tests; there is no CLI
+// clock override that could make an expired production approval look current.
+const dateBoundaries = spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), ['-c', `
+import datetime as dt, importlib.util, pathlib, sys
+script = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(script.parent))
+spec = importlib.util.spec_from_file_location('preflight', script)
+preflight = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(preflight)
+as_of = dt.date(2040, 2, 29)
+assert not preflight._review_date_issues('2040-02-28', '2040-02-29', 'review', as_of)
+assert not preflight._review_date_issues('2040-02-29', '2040-03-01', 'review', as_of)
+assert any('overdue' in issue for issue in preflight._review_date_issues('2040-02-27', '2040-02-28', 'review', as_of))
+assert any('future' in issue for issue in preflight._review_date_issues('2040-03-01', '2040-03-02', 'review', as_of))
+assert any('precedes' in issue for issue in preflight._review_date_issues('2040-03-02', '2040-03-01', 'review', as_of))
+fixtures = script.parent.parent / 'test-fixtures' / 'docs'
+supplier = (fixtures / 'supplier-evidence-register.md').read_text(encoding='utf-8')
+assert not preflight._validate_supplier_evidence_register(supplier, dt.date(2026, 9, 7))
+assert any('overdue' in issue for issue in preflight._validate_supplier_evidence_register(supplier, dt.date(2028, 1, 1)))
+legal = (fixtures / 'legal-source-register.md').read_text(encoding='utf-8')
+assert any('future' in issue for issue in preflight._validate_legal_source_register(legal, dt.date(2026, 8, 3)))
+oauth = (fixtures / 'policy-decisions' / 'oauth-token-management.md').read_text(encoding='utf-8')
+assert not preflight._validate_oauth_token_management(oauth, 'production', dt.date(2026, 11, 2))
+assert any('overdue' in issue for issue in preflight._validate_oauth_token_management(oauth, 'production', dt.date(2026, 11, 3)))
+`, SCRIPT], { encoding: 'utf8' });
+check('UTC expiry boundaries and leap dates are deterministic', dateBoundaries.status, 0);
 fs.rmSync(TMP, { recursive: true, force: true });
 
 console.log(`\npassed=${pass} failed=${fail}`);

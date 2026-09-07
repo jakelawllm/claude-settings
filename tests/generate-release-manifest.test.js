@@ -14,6 +14,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { copyEvidence } = require('./synthetic-evidence');
+
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'generate-release-manifest.py');
 const REPO_ROOT = path.join(__dirname, '..');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'grm-'));
@@ -130,6 +132,8 @@ const definition = path.join(TMP, 'matter-definition.json');
 const generatedPolicy = path.join(TMP, 'generated-policy.json');
 const renderedSettings = path.join(TMP, 'rendered-settings.json');
 const generatedManifest = path.join(TMP, 'generated-manifest.json');
+const currentEvidence = path.join(TMP, 'current-evidence');
+copyEvidence(currentEvidence);
 fs.writeFileSync(definition, JSON.stringify({ matter_id: 'synthetic-1', name: 'Synthetic', root: '/synthetic-matters/Smith', aliases: [], allowed_tooling_paths: ['/usr/bin', '/opt/claude'], allowed_domains: ['api.anthropic.com'], record_root: null }));
 function bundleScript(name, args) {
   return spawnSync(PYTHON, [path.join(REPO_ROOT, 'scripts', name), ...args], { encoding: 'utf8' });
@@ -142,7 +146,7 @@ const render = bundleScript('render-production-settings.py', ['--template', path
   '--sandbox-policy', generatedPolicy, '--hook-path', installedHook]);
 check('bundle workflow renders repository template', render.status, 0);
 if (render.status === 0) {
-  const preflight = bundleScript('preflight-validate.py', ['--mode', 'production', '--evidence-root', path.join(REPO_ROOT, 'test-fixtures'), renderedSettings]);
+  const preflight = bundleScript('preflight-validate.py', ['--mode', 'production', '--evidence-root', currentEvidence, renderedSettings]);
   check('bundle workflow respects target host gate', preflight.status, process.platform === 'linux' ? 0 : 1);
   check('bundle workflow reports correct evidence/host result', preflight.stdout.includes(process.platform === 'linux' ? 'PASS: production preconditions met' : (process.platform === 'win32' ? 'native Windows is not supported' : 'production requires a Linux/WSL2 target')), true);
   const manifestArgs = ['--output', generatedManifest, '--production-settings', renderedSettings, '--sandbox-policy', generatedPolicy, '--allow-dirty'];

@@ -14,7 +14,7 @@ import re
 import shlex
 import tempfile
 from datetime import date
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 VERSION_RE = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+\Z")
 UUID_RE = re.compile(r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}\Z")
@@ -47,13 +47,15 @@ def valid_domain(value: object) -> bool:
 
 
 def valid_https_endpoint(value: object) -> bool:
-    if not isinstance(value, str) or any(c.isspace() for c in value):
+    """Validate a generic OTLP base URL, not a per-signal exporter endpoint."""
+    if not isinstance(value, str) or any(c.isspace() for c in value) or "?" in value or "#" in value:
         return False
     try:
         parsed = urlsplit(value)
+        signal_path = re.search(r"/v1/(?:traces|logs|metrics)$", posixpath.normpath(unquote(parsed.path)))
         return bool(parsed.scheme == "https" and parsed.hostname
                     and not parsed.username and not parsed.password
-                    and not parsed.fragment and parsed.port != 0)
+                    and not signal_path and parsed.port != 0)
     except ValueError:
         return False
 

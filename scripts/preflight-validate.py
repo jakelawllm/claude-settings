@@ -38,12 +38,14 @@ fails on any of the following (CFG-01/03/05/06):
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import pathlib
 import platform
 import re
 import sys
 from typing import Any
+from urllib.parse import urlsplit
 from release_validation import (VERSION_RE, valid_date, valid_https_endpoint, valid_posix_path,
                                 validate_sandbox, validate_matter_scope, hook_script, version_tuple)
 
@@ -55,8 +57,6 @@ UUID_RE = re.compile(
 )
 PLACEHOLDER_TOKENS = ("REPLACE-WITH",)
 
-ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-URL_PREFIX_RE = re.compile(r"^https?://")
 PLACEHOLDER_MARKERS = (
     "REPLACE-WITH",
     "OWNER-REQUIRED",
@@ -70,6 +70,17 @@ PLACEHOLDER_MARKERS = (
 def _is_register_placeholder(value: str) -> bool:
     """True when a register cell value is still an unresolved placeholder."""
     return any(marker in value.upper() for marker in PLACEHOLDER_MARKERS)
+
+
+def _valid_source_url(value: str) -> bool:
+    if _is_register_placeholder(value) or any(c.isspace() or c == "\\" for c in value):
+        return False
+    try:
+        parsed = urlsplit(value)
+        return bool(parsed.scheme in ("http", "https") and parsed.hostname
+                    and not parsed.username and not parsed.password and parsed.port != 0)
+    except ValueError:
+        return False
 
 
 def _parse_markdown_table(text: str) -> list[list[str]]:
@@ -146,7 +157,29 @@ def _find_decision_field(text: str, label: str) -> str:
     return match.group(1).strip() if match else ""
 
 
-def _validate_oauth_token_management(text: str, mode: str) -> list[str]:
+def _utc_today() -> dt.date:
+    return dt.datetime.now(dt.timezone.utc).date()
+
+
+def _completed_date_issues(value: str, label: str, assessment_date: dt.date) -> list[str]:
+    if valid_date(value) and dt.date.fromisoformat(value) > assessment_date:
+        return [f"{label} is in the future (assessed on {assessment_date.isoformat()} UTC)"]
+    return []
+
+
+def _review_date_issues(completed: str, due: str, label: str, assessment_date: dt.date) -> list[str]:
+    """A due date remains valid through that UTC calendar day."""
+    issues = _completed_date_issues(completed, f"{label} completed date", assessment_date)
+    if valid_date(due):
+        due_date = dt.date.fromisoformat(due)
+        if due_date < assessment_date:
+            issues.append(f"{label} is overdue (due {due}, assessed on {assessment_date.isoformat()} UTC)")
+        if valid_date(completed) and due_date < dt.date.fromisoformat(completed):
+            issues.append(f"{label} due date precedes its completed date")
+    return issues
+
+
+def _validate_oauth_token_management(text: str, mode: str, assessment_date: dt.date | None = None) -> list[str]:
     """Static-token exceptions must be scope-aware and positively recorded."""
     status = _find_status(text)
     if not status:
@@ -180,19 +213,26 @@ def _validate_oauth_token_management(text: str, mode: str) -> list[str]:
             issues.append(f"oauth-token-management field {field!r} is unresolved")
 
     if mode == "production":
+        assessment_date = assessment_date or _utc_today()
         for field in ("Date", "Last rotated", "Next rotation due"):
             value = _find_decision_field(text, field)
             if value and not valid_date(value):
                 issues.append(f"oauth-token-management field {field!r} has no ISO date")
+        issues.extend(_completed_date_issues(_find_decision_field(text, "Date"), "oauth-token-management approval date", assessment_date))
+        issues.extend(_review_date_issues(
+            _find_decision_field(text, "Last rotated"), _find_decision_field(text, "Next rotation due"),
+            "oauth-token-management rotation", assessment_date,
+        ))
     return issues
 
 
-def _validate_supplier_evidence_register(text: str) -> list[str]:
+def _validate_supplier_evidence_register(text: str, assessment_date: dt.date | None = None) -> list[str]:
     """Each row must carry a source URL, an ISO verified date, a named owner and an ISO next-review date."""
     rows = _parse_markdown_table(text)
     if not rows:
         return ["supplier evidence register has no table rows"]
     issues: list[str] = []
+    assessment_date = assessment_date or _utc_today()
     required_claims = (
         "Inputs and outputs are not used to train any model",
         "Inputs and outputs are not made publicly available",
@@ -207,7 +247,7 @@ def _validate_supplier_evidence_register(text: str) -> list[str]:
             issues.append(f"supplier evidence register row {i + 1} has too few columns")
             continue
         url, verified, owner, review = row[1], row[2], row[3], row[4]
-        if not URL_PREFIX_RE.match(url):
+        if not _valid_source_url(url):
             issues.append(f"supplier evidence register row {i + 1} source URL is not http(s)")
         if not valid_date(verified):
             issues.append(f"supplier evidence register row {i + 1} verified date is not an ISO date")
@@ -215,15 +255,17 @@ def _validate_supplier_evidence_register(text: str) -> list[str]:
             issues.append(f"supplier evidence register row {i + 1} owner is unresolved")
         if not valid_date(review):
             issues.append(f"supplier evidence register row {i + 1} next-review date is not an ISO date")
+        issues.extend(_review_date_issues(verified, review, f"supplier evidence register row {i + 1} review", assessment_date))
     return issues
 
 
-def _validate_legal_source_register(text: str) -> list[str]:
+def _validate_legal_source_register(text: str, assessment_date: dt.date | None = None) -> list[str]:
     """Each row must carry an authorised source URL, a named owner, an ISO date checked and an ISO next review."""
     rows = _parse_markdown_table(text)
     if not rows:
         return ["legal source register has no table rows"]
     issues: list[str] = []
+    assessment_date = assessment_date or _utc_today()
     for instrument in ("SC Gen 23", "Federal Court", "Federal Circuit and Family Court", "Solicitors' Conduct Rules"):
         if sum(instrument in row[0] for row in rows) != 1:
             issues.append(f"legal source register must contain exactly one entry for: {instrument}")
@@ -231,19 +273,22 @@ def _validate_legal_source_register(text: str) -> list[str]:
         if len(row) < 7:
             issues.append(f"legal source register row {i + 1} has too few columns")
             continue
-        source, owner, checked, review = row[2], row[4], row[5], row[6]
-        if not URL_PREFIX_RE.match(source):
+        source, interpretation, owner, checked, review = row[2], row[3], row[4], row[5], row[6]
+        if not _valid_source_url(source):
             issues.append(f"legal source register row {i + 1} authorised source is not http(s)")
+        if not interpretation or _is_register_placeholder(interpretation) or re.match(r"(?i)^(?:NOT APPROVED|UNAPPROVED|REJECTED)\b", interpretation):
+            issues.append(f"legal source register row {i + 1} approved interpretation is unresolved")
         if not owner or _is_register_placeholder(owner):
             issues.append(f"legal source register row {i + 1} owner is unresolved")
         if not valid_date(checked):
             issues.append(f"legal source register row {i + 1} date checked is not an ISO date")
         if not valid_date(review):
             issues.append(f"legal source register row {i + 1} next review is not an ISO date")
+        issues.extend(_review_date_issues(checked, review, f"legal source register row {i + 1} review", assessment_date))
     return issues
 
 
-def _validate_data_flow_model(text: str) -> list[str]:
+def _validate_data_flow_model(text: str, assessment_date: dt.date | None = None) -> list[str]:
     """Three owner sign-offs (privacy, security, records) each with a named owner, an ISO date and evidence."""
     names = re.findall(r"\*\*Name:\*\*\s*(.+)", text)
     dates = re.findall(r"\*\*Date:\*\*\s*(.+)", text)
@@ -256,6 +301,7 @@ def _validate_data_flow_model(text: str) -> list[str]:
             )
         ]
     issues: list[str] = []
+    assessment_date = assessment_date or _utc_today()
     labels = ("privacy", "security", "records")
     for i in range(3):
         name = names[i].strip()
@@ -265,6 +311,7 @@ def _validate_data_flow_model(text: str) -> list[str]:
             issues.append(f"data-flow model {labels[i]} owner name is unresolved")
         if not valid_date(date):
             issues.append(f"data-flow model {labels[i]} owner date is not an ISO date")
+        issues.extend(_completed_date_issues(date, f"data-flow model {labels[i]} owner date", assessment_date))
         if not evidence or _is_register_placeholder(evidence):
             issues.append(f"data-flow model {labels[i]} owner evidence is unresolved")
     return issues
@@ -286,13 +333,14 @@ EXPECTED_OPERATIONAL_GATES = (
 )
 
 
-def _validate_operational_evidence_register(text: str) -> list[str]:
+def _validate_operational_evidence_register(text: str, assessment_date: dt.date | None = None) -> list[str]:
     """Every operational gate must have an owner, ISO date and evidence reference."""
     rows = _parse_markdown_table(text)
     if not rows:
         return ["operational evidence register has no table rows"]
 
     issues: list[str] = []
+    assessment_date = assessment_date or _utc_today()
     seen: set[str] = set()
     expected = set(EXPECTED_OPERATIONAL_GATES)
     for i, row in enumerate(rows):
@@ -309,6 +357,7 @@ def _validate_operational_evidence_register(text: str) -> list[str]:
             issues.append(f"operational evidence register row {i + 1} owner is unresolved")
         if not valid_date(date):
             issues.append(f"operational evidence register row {i + 1} date is not an ISO date")
+        issues.extend(_completed_date_issues(date, f"operational evidence register row {i + 1} date", assessment_date))
         if not evidence or _is_register_placeholder(evidence):
             issues.append(f"operational evidence register row {i + 1} evidence reference is unresolved")
 
@@ -394,6 +443,7 @@ def check_governance_registers(
     mode: str,
     settings_path: pathlib.Path,
     evidence_root: pathlib.Path | None = None,
+    assessment_date: dt.date | None = None,
 ) -> None:
     """Verify governance registers are resolved.
 
@@ -404,6 +454,7 @@ def check_governance_registers(
     the repository registers. Files beside settings must not silently shadow
     unresolved repository evidence.
     """
+    assessment_date = assessment_date or _utc_today()
     for rel_path, validator in GOVERNANCE_REGISTERS:
         full = (evidence_root or REPO_ROOT) / rel_path
         if not full.exists():
@@ -419,9 +470,11 @@ def check_governance_registers(
             errors.append(f"governance register unreadable: {rel_path}")
             continue
         if rel_path == "docs/policy-decisions/oauth-token-management.md":
-            issues = validator(text, mode)
-        else:
+            issues = validator(text, mode, assessment_date)
+        elif rel_path == "docs/policy-decisions/expert-report-rule.md":
             issues = validator(text)
+        else:
+            issues = validator(text, assessment_date)
         if issues:
             for issue in issues:
                 msg = f"governance register unresolved: {rel_path} — {issue}"
@@ -434,6 +487,7 @@ def check_governance_registers(
 def validate(
     settings: dict[str, Any], settings_path: pathlib.Path, mode: str,
     evidence_root: pathlib.Path | None = None,
+    assessment_date: dt.date | None = None,
 ) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -687,7 +741,7 @@ def validate(
             errors.append("requiredMinimumVersion must be at least 2.1.251 for managed telemetry endpoint protection")
 
     # --- Governance registers ---------------------------------------------
-    check_governance_registers(errors, warnings, mode, settings_path, evidence_root)
+    check_governance_registers(errors, warnings, mode, settings_path, evidence_root, assessment_date)
 
     return errors, warnings
 

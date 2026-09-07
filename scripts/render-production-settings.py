@@ -4,7 +4,7 @@
         --firm-name "Example Legal" \
         --org-uuid 11111111-2222-3333-4444-555555555555 \
         --matter-roots "/srv/matters;/Volumes/matters" \
-        --otel-endpoint "https://collector.internal/v1/traces" \
+        --otel-endpoint "https://collector.internal" \
         --sandbox-policy dist/sandbox-policy.json
 
 The checked-in `managed-settings.json` is a template: it carries
@@ -255,7 +255,7 @@ def render(
     if not valid_posix_path(hook_path) or pathlib.PurePosixPath(hook_path).name != "matter-guard.js":
         errors.append("hook path must be a literal absolute POSIX path ending in matter-guard.js")
     if not disable_telemetry and otel_endpoint and not valid_https_endpoint(otel_endpoint):
-        errors.append("telemetry endpoint must be a valid HTTPS URL without credentials or fragment")
+        errors.append("telemetry endpoint must be an HTTPS base URL without credentials, query, fragment or /v1/traces, /v1/logs, /v1/metrics suffix")
 
     sandbox_policy = None
     if sandbox_policy_path:

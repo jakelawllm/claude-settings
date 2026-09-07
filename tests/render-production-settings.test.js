@@ -119,7 +119,7 @@ const r1 = run([
   '--firm-name', 'Acme Legal',
   '--org-uuid', '11111111-2222-3333-4444-555555555555',
   '--matter-roots', '/srv/matters;/Volumes/matters',
-  '--otel-endpoint', 'https://collector.internal/v1/traces',
+  '--otel-endpoint', 'https://collector.internal',
   '--hook-path', '/Library/Application Support/ClaudeCode/hooks/matter-guard.js',
   ...sandboxArgs,
 ]);
@@ -129,7 +129,7 @@ check('02 renderer sets enforce mode', rendered1.env.CLAUDE_MATTER_MODE, 'enforc
 check('03 renderer sets failIfUnavailable true', rendered1.sandbox.failIfUnavailable, true);
 check('04 renderer replaces firm name placeholder', rendered1.claudeMd.includes('Acme Legal'), true);
 check('05 renderer rewrites hook path', rendered1.hooks.PreToolUse[0].hooks[0].command.includes('/Library/Application Support/ClaudeCode/hooks/matter-guard.js'), true);
-check('06 renderer writes OTEL endpoint', rendered1.env.OTEL_EXPORTER_OTLP_ENDPOINT, 'https://collector.internal/v1/traces');
+check('06 renderer writes OTEL endpoint', rendered1.env.OTEL_EXPORTER_OTLP_ENDPOINT, 'https://collector.internal');
 check('07 renderer removes template notes', Object.prototype.hasOwnProperty.call(rendered1, '_template_comment'), false);
 
 // 08-09: refuse overwrite without --force
@@ -139,7 +139,7 @@ const r8 = run([
   '--firm-name', 'Acme Legal',
   '--org-uuid', '11111111-2222-3333-4444-555555555555',
   '--matter-roots', '/srv/matters',
-  '--otel-endpoint', 'https://collector.internal/v1/traces',
+  '--otel-endpoint', 'https://collector.internal',
   ...sandboxArgs,
 ]);
 check('08 renderer refuses overwrite without --force', r8.code, 1);
@@ -152,7 +152,7 @@ const r10 = run([
   '--firm-name', 'Acme Legal',
   '--org-uuid', '11111111-2222-3333-4444-555555555555',
   '--matter-roots', '/srv/matters',
-  '--otel-endpoint', 'https://collector.internal/v1/traces',
+  '--otel-endpoint', 'https://collector.internal',
   '--force',
   ...sandboxArgs,
 ]);
@@ -169,7 +169,7 @@ const r13 = run([
   '--firm-name', 'Acme Legal',
   '--org-uuid', '11111111-2222-3333-4444-555555555555',
   '--matter-roots', 'matters',
-  '--otel-endpoint', 'https://collector.internal/v1/traces',
+  '--otel-endpoint', 'https://collector.internal',
   ...sandboxArgs,
 ]);
 check('13 renderer rejects relative matter roots', r13.code, 1);
@@ -201,7 +201,7 @@ const r19 = run(
     CLAUDE_FIRM_NAME: 'Env Legal',
     CLAUDE_ORG_UUID: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee',
     CLAUDE_MATTER_ROOTS: '/srv/matters',
-    OTEL_EXPORTER_OTLP_ENDPOINT: 'https://env-collector.internal/v1/traces',
+    OTEL_EXPORTER_OTLP_ENDPOINT: 'https://env-collector.internal',
     CLAUDE_SANDBOX_POLICY: sandboxPolicyPath,
   }
 );
@@ -216,7 +216,7 @@ const r21 = run([
   '--output', out5,
   '--firm-name', 'Acme Legal',
   '--matter-roots', '/srv/matters',
-  '--otel-endpoint', 'https://collector.internal/v1/traces',
+  '--otel-endpoint', 'https://collector.internal',
   ...sandboxArgs,
 ]);
 check('21 renderer rejects missing org UUID', r21.code, 1);
@@ -231,7 +231,7 @@ const r23 = run([
   '--firm-name', 'Acme Legal',
   '--org-uuid', '11111111-2222-3333-4444-555555555555',
   '--matter-roots', '/srv/matters',
-  '--otel-endpoint', 'https://collector.internal/v1/traces',
+  '--otel-endpoint', 'https://collector.internal',
   ...sandboxArgs,
 ]);
 check('23 renderer rejects template with no hooks block', r23.code, 1);
@@ -245,7 +245,7 @@ const r25 = run([
   '--firm-name', 'Acme Legal',
   '--org-uuid', '11111111-2222-3333-4444-555555555555',
   '--matter-roots', '/srv/matters',
-  '--otel-endpoint', 'https://collector.internal/v1/traces',
+  '--otel-endpoint', 'https://collector.internal',
 ]);
 check('25 renderer rejects missing sandbox policy', r25.code, 1);
 check('26 renderer reports missing sandbox policy', r25.stdout.includes('sandbox policy is required'), true);
@@ -262,7 +262,7 @@ const r27 = run([
   '--firm-name', 'Acme Legal',
   '--org-uuid', '11111111-2222-3333-4444-555555555555',
   '--matter-roots', '/srv/matters',
-  '--otel-endpoint', 'https://collector.internal/v1/traces',
+  '--otel-endpoint', 'https://collector.internal',
   ...sandboxArgs,
 ]);
 check('27 renderer rejects template missing managed-control keys', r27.code, 1);
@@ -282,7 +282,7 @@ const r30 = run([
   '--firm-name', 'Acme Legal',
   '--org-uuid', '11111111-2222-3333-4444-555555555555',
   '--matter-roots', '/srv/matters',
-  '--otel-endpoint', 'https://collector.internal/v1/traces',
+  '--otel-endpoint', 'https://collector.internal',
   ...sandboxArgs,
 ]);
 check('30 renderer rejects template missing permissions.deny', r30.code, 1);
@@ -345,6 +345,22 @@ fs.writeFileSync(badParent, 'synthetic');
 const badWrite = run([...validArgs, '--output', path.join(badParent, 'output.json')]);
 check('write failure is handled', badWrite.code, 1);
 check('write failure has no traceback', badWrite.stderr.includes('Traceback'), false);
+const telemetryArgs = validArgs.filter(arg => arg !== '--disable-telemetry');
+for (const endpoint of [
+  'https://collector.internal?synthetic=1', 'https://collector.internal?',
+  'https://collector.internal#fragment', 'https://collector.internal#',
+  'https://collector.internal/v1/traces', 'https://collector.internal/v1/logs',
+  'https://collector.internal/v1/metrics', 'https://collector.internal/v1/traces/',
+  'https://collector.internal/otlp/v1/logs', 'https://collector.internal/v1/%74races',
+]) {
+  const before = fs.readFileSync(out1, 'utf8');
+  const result = run([...telemetryArgs, '--otel-endpoint', endpoint]);
+  check(`invalid OTLP base URL rejected: ${endpoint}`, result.code, 1);
+  check('invalid endpoint preserves output', fs.readFileSync(out1, 'utf8') === before, true);
+}
+const basePathEndpoint = 'https://collector.internal/otlp';
+check('HTTPS collector base path accepted', run([...telemetryArgs, '--otel-endpoint', basePathEndpoint]).code, 0);
+check('collector base path retained exactly', readJson(out1).env.OTEL_EXPORTER_OTLP_ENDPOINT, basePathEndpoint);
 if (process.platform !== 'win32') check('rendered file is owner-only', fs.statSync(out1).mode & 0o777, 0o600);
 fs.rmSync(TMP, { recursive: true, force: true });
 console.log(`\npassed=${pass} failed=${fail}`);
