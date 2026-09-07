@@ -203,6 +203,14 @@ def match_is_allowed(filename, content, match, source="diff", label=""):
     match_text = match.group(0)
     if any(a.fullmatch(match_text) for a in ALLOW_MATCH):
         return True
+    # These scanner regex source literals describe the synthetic NAS example;
+    # do not exempt any other text on those lines or elsewhere in the files.
+    if filename in {"scripts/scan-history.py", "scripts/scan-docx-xml.py"} and label == "UNC path":
+        slash = chr(92)
+        base = "^" + slash * 4 + "nas" + slash + ".example" + slash * 2 + "[A-Za-z0-9_.$-]+"
+        optional_tail = "(?:" + slash * 2 + "[^" + slash + "s]*)?"
+        if content.strip() in {f're.compile(r"{base}$"),', f're.compile(r"{base}{optional_tail}$"),'}:
+            return True
     # Scan this scanner too. Only its two literal synthetic UNC comparisons
     # need an exception; future credentials added elsewhere must still fail.
     if filename == "scripts/scan-history.py" and label == "UNC path":
