@@ -1,8 +1,11 @@
 # Internal MVP Readiness Report
 
-**Assessment date:** 2026-09-07  
-**Assessed code commit:** `0f61ac4` (updated after final integration below)  
-**Baseline:** `e25608d975ef58d31bd4ff7984eabb0622046b22` on `main`  
+**Assessment date:** 2026-09-07
+
+**Assessed code commit:** `0d6b842`
+
+**Baseline:** `e25608d975ef58d31bd4ff7984eabb0622046b22` on `main`
+
 **Working branch:** `fix/internal-mvp-readiness-20260907`
 
 ## Decision and scope
@@ -29,8 +32,8 @@ Historical observations are not rewritten into passes. This is the editable curr
 ## Baseline and repository inspection
 
 - A fresh clone of default branch `main` was clean at the baseline above. No existing user checkout changes were modified.
-- Inspected recent commits, open PRs #8/#9/#11 and dependency PRs #16/#18/#19/#20/#21/#22 before changes. Existing remediation overlapped parts of the audit; this branch was built from current main without merging other branches. Existing PRs remain open.
-- GitHub issues were disabled. Dependabot's accessible alerts API returned no open alerts; this is not a claim that all possible dependencies are vulnerability-free. Version-only dependency PRs were not blindly adopted.
+- Inspected recent commits, open PRs #8/#9/#11 and dependency PRs #16/#18/#19/#20/#21/#22 before changes. Existing remediation overlapped parts of the audit; this branch was built from current main without merging other branches. Existing PRs remain open. Final repository API inspection also confirmed secret scanning, push protection and Dependabot security updates enabled.
+- GitHub issues were disabled. Dependabot's accessible alerts API returned no open alerts; this is not a claim that all possible dependencies are vulnerability-free. Pinned dependencies were retained; version-only update PRs remain open.
 - Baseline CI succeeded: [run 31778513736](https://github.com/jakelawllm/claude-settings/actions/runs/31778513736). Default-branch protection required a code-owner review, dismissed stale reviews, enforced administrators and required three platform hook checks, settings/policy and secret scan; force pushes were disabled.
 - Read applicable parent instructions, root CLAUDE, README, contributing/security guidance, architecture, deployment/checklist, operations/evidence/policy-decision documents, settings examples and the uploaded reports. Added repository AGENTS instructions without weakening controls.
 - Runtime: Node 22 LTS, Python 3.12, Git and the hash-locked Python dependencies. Node has no package dependencies. There is no environment-file loader; JSON and CLI/environment inputs are documented in [configuration](environment.md).
@@ -50,7 +53,7 @@ Severity here uses the requested internal-MVP scale. Historical critical/high ra
 | SEC-03 | Fixed | FIXED | Exclusive binding creation, immutability and real concurrent-process regressions in `matter-guard.test.js`; 200 additional simultaneous first-touch pairs had one consistent winner. |
 | SEC-04 | Fixed | FIXED | Refuses ancestors of any configured root, multiple/nested root ambiguity and archive/state roots. Adversarial multi-root regressions execute the hook. |
 | SEC-05 | P1 | PARTIALLY FIXED | Exact managed domains, restrictive sandbox validation and `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` added. Process/filesystem credential exposure and real egress require host observation: MVP-01. |
-| SEC-06 | P1 | PARTIALLY FIXED | Hook input/configuration/state failures exit nonzero with complete synchronous output; strict hook command/event wiring checked. An absent executable or client timeout cannot be made a reliable boundary by that hook itself; launcher negative control remains MVP-01. |
+| SEC-06 | P1 | PARTIALLY FIXED | PreToolUse faults in enforce mode emit complete synchronous deny JSON (normally exit 0 under the hook protocol); output failure attempts exit 2. SessionStart/archive faults report context or a filing-gap message. Strict hook command/event wiring checked. An absent executable or client timeout cannot be made a reliable boundary by that hook itself; launcher negative control remains MVP-01. |
 | SEC-07 | Fixed | FIXED | Targets are validated before binding, so an initially denied cross-matter operation cannot poison session identity. Regression covers first denied call. |
 | SEC-08 | Fixed / P1 host | PARTIALLY FIXED | Unknown mode, placeholders, unusable/nested roots and unsafe state/archive configuration reject. Installed ownership, ACL and policy-source controls require MVP-01. |
 | SEC-09 | Fixed | FIXED | Relative targets resolve from event cwd; failed realpath resolution refuses instead of becoming a non-client path. Symlink/junction and nonexistent-path tests included. |
@@ -62,10 +65,10 @@ Severity here uses the requested internal-MVP scale. Historical critical/high ra
 |---|---|---|---|
 | FUNC-01 | Fixed / bounded live evidence | PARTIALLY FIXED | Baseline already registered Skill/AskUserQuestion/Agent. Added correct LSP `filePath`, Monitor cwd handling and tests; 15 registered workflow-tool invocations allowed. Version-specific live tool inventory remains part of MVP-01 acceptance. |
 | FUNC-02 | Fixed | FIXED | README, AGENTS, SECURITY and architecture now say wildcard matcher and unknown-tool denial; Bash checked by cwd only. |
-| FUNC-03 | Fixed | FIXED | Live harness uses the real wildcard matcher, installed hook and traced hook-event/decision assertions; does not silently narrow production matching. |
+| FUNC-03 | Fixed | FIXED | Live harness uses the real wildcard matcher, repository hook via a temporary traced wrapper and hook-event/decision assertions; does not silently narrow production matching. |
 | REC-01 | Fixed | FIXED | Central archive includes full hash of canonical matter identity before matter name. Same-named matters under separate roots remain distinct. Legacy layout is preserved with an explicit operator migration procedure. |
 | REC-02 | Fixed | FIXED | Session filenames use full identity hash and source timestamp; atomic private write/fsync/hard-link publication prevents overwrite. Same-byte retry is idempotent; differing content refuses. Concurrent retries tested. |
-| REC-03 | Fixed / P1 operations | PARTIALLY FIXED | Corrupt binding no longer falls back to cwd; unsafe destination refuses and filing gaps are reported. Human alerting/recovery and retention of the source transcript require MVP-03. |
+| REC-03 | Fixed / P1 operations | PARTIALLY FIXED | Corrupt binding no longer falls back to cwd; unsafe destination refuses and filing gaps are reported. Supervised alerting/recovery and retention of the source transcript require MVP-03. |
 | REC-04 | P1 for retained client records | PARTIALLY FIXED | Actual JSONL producer is now distinguished from external event schema; published example is tested. Recovery/manual filing is documented. Operational backup, access, retention and verified recovery remain MVP-03. No records-service implementation is claimed. |
 
 ### Configuration and release
@@ -97,10 +100,10 @@ Severity here uses the requested internal-MVP scale. Historical critical/high ra
 |---|---|---|---|
 | SUP-01 | Fixed | FIXED | Existing real hash lock was newer than the report; added missing conditional Windows `colorama`. Fresh installation with `--require-hashes` and `pip check` executed. |
 | SUP-02 | Fixed | FIXED | Cached schema and validator dependencies pinned; LF attributes preserve raw schema hash on Windows. No network schema download during verification. |
-| SUP-03 | P2/P3 limitation | PARTIALLY FIXED | History/content/filename/ref/tag and current/historical Office XML scans strengthened; allowlist, added-line, split-run/entity and redaction regressions added. Malformed/shallow input fails. Heuristics cannot establish absence of every possible encoded secret; independent platform scanning remains useful. |
+| SUP-03 | P2/P3 limitation | PARTIALLY FIXED | History/content/filename/ref/tag and current/historical Office XML scans strengthened; allowlist, added-line, split-run/entity and redaction regressions added. Malformed/shallow input fails. Heuristics cannot establish absence of every possible encoded secret; GitHub secret scanning and push protection were also verified enabled; no scanner guarantees every arbitrary encoding. |
 | SUP-04 | None | INVALID OR NO LONGER APPLICABLE | Unpinned plugin-download review workflow was removed before this baseline. Current Actions are SHA-pinned. |
-| SUP-05 | P2 optional feature | ACCEPTED FOR INTERNAL MVP | Claude workflow disabled unless repository variable explicitly enables it. Expired recorded token-rotation date is not fabricated or updated. Rotate/record before optional activation; this secret is unnecessary for offline or local authenticated tests. |
-| SUP-06 | Fixed / optional live test | PARTIALLY FIXED | Disabled by default, verifies trusted association and current write permission, explicitly passes a read-only GitHub token and grants no OIDC permission. No untrusted PR code execution or write-capable app-token minting. Optional credentialed workflow has not been enabled/tested. |
+| SUP-05 | P2 optional feature | ACCEPTED FOR INTERNAL MVP | GitHub workflow 322652643 was disabled during this review and its API state verified as disabled_manually; candidate YAML additionally requires an explicit enable variable. Expired recorded token-rotation date is not fabricated or updated. A same-day, artifact-bound disablement record is accepted by preflight; rotate/record before optional activation; this secret is unnecessary for offline or local authenticated tests. |
+| SUP-06 | Fixed / optional live test | PARTIALLY FIXED | Verified remotely disabled, additionally requires explicit opt-in, verifies trusted association and current write permission, explicitly passes a read-only GitHub token and grants no OIDC permission. The explicit token prevents broader app-token minting. The fixed prompt is not a general code-execution sandbox; optional enablement still requires controlled acceptance. Optional credentialed workflow has not been enabled/tested. |
 | SUP-07 | P1 deployment / P3 release extras | PARTIALLY FIXED | Protected default branch inspected; manifests hash current artifacts and actual version. Installed signature/rollback evidence remains MVP-01. SBOM and broader release automation can wait until wider distribution. |
 
 ### Policy and documentation
@@ -128,12 +131,12 @@ Severity here uses the requested internal-MVP scale. Historical critical/high ra
 | Addendum 2: seven-year archival assumption | FIXED | Records retention follows matter retention and holds under clause 17.4; no universal seven-year deletion job is advertised or implemented. |
 | Addendum 3 central archive versus Addendum 4 matter-folder default | FIXED | Addendum 4's per-matter default is implemented; optional central archives use canonical identity separation. Operator migration/access acceptance remains MVP-03 where relevant. |
 | Addendum 5 expert-report decision | FIXED | Approved Option A retained across policy, skill and managed standing instruction. |
-| Addenda 6/7 H-05, H-06, M-06 interpretation/facts/evidence and worked-example wording | FIXED / external adoption | DOCX now explicitly requires principal approval/date for clause 8.8 interpretation and labels Part E a worked example. Actual adoption approvals are not supplied: MVP-02. |
+| Addenda 6/7 H-05, H-06, M-06 interpretation/facts/evidence and worked-example wording | PARTIALLY FIXED | DOCX now explicitly requires principal approval/date for clause 8.8 interpretation and labels Part E a worked example. Actual adoption approvals are not supplied: MVP-02. |
 | Addenda 6/7 H-07 PDF visual review | FIXED | Both authoritative DOCX files rendered through LibreOffice: 31 and 30 pages. All pages reviewed as contact sheets and text bounds checked; contents overflow and split table rows corrected. Layout review is not legal approval. |
 
 ## New defects corrected during this review
 
-- Windows hash restoration and raw schema-byte portability, beyond the stale report's lock-file claim.
+- Windows hash restoration and raw schema/release-artifact byte portability, beyond the stale report's lock-file claim. Fresh Windows and Linux release inputs now have identical hashes.
 - Missing telemetry content gates, generic OTLP signal-path misuse and subprocess credential scrubbing. [Official monitoring documentation](https://code.claude.com/docs/en/monitoring-usage) supports minimum-version and explicit logging controls; [environment documentation](https://code.claude.com/docs/en/env-vars) explains the scrub switch.
 - Host-dependent POSIX validation, weak nested sandbox policies, contradictory manifest/sandbox data and atomic/no-clobber output behavior.
 - Stale and future evidence dates and ambiguous evidence-root selection. Synthetic fixture dates are generated only in a fresh temporary tree; real registers are never auto-approved.
@@ -142,20 +145,23 @@ Severity here uses the requested internal-MVP scale. Historical critical/high ra
 
 ## Verification record
 
-Commands are run from the repository root with the hash-installed Python 3.12 environment. Full results are updated after integration; no pending result is a pass.
+Commands were run from the repository root with the hash-installed Python 3.12 environment. Full suites passed at `bbf182b`. The subsequent `0d6b842` changes only checkout line-ending attributes: six release inputs were compared between a fresh Windows CRLF-default clone and Linux and matched byte-for-byte, and all 31 manifest assertions passed again in that Windows clone. No program logic changed after the full suites.
 
 | Executed check | Result |
 |---|---|
 | Windows fresh `python -m pip install --require-hashes -r requirements-lock.txt`; `python -m pip check` | Passed after conditional dependency correction. |
-| `python scripts/verify.py` on Windows | Final integrated run pending at report creation. |
-| Clean Linux restore and `python scripts/verify.py`, Node 22/Python 3.12 | Final integrated run pending at report creation. |
+| `python scripts/verify.py` on Windows | Passed: 12 suites, 712 assertions, 0 failures; 5 explicit POSIX hook skips plus 1 POSIX-only renderer assertion not run. Node 24.18.0 / Python 3.12.10. |
+| Clean Linux restore and `python scripts/verify.py`, Node 22/Python 3.12 | Passed: 12 suites, 718 assertions, 0 failures, 0 platform skips. Node 22.23.2 / Python 3.12.14 in an isolated non-root verification container. This image is test infrastructure, not a supplied deployment launcher. |
 | Native `CLAUDE_E2E=1 node tests/e2e.test.js` with explicit executable | 13 passed, 0 failed; Claude 2.1.263. Real successful read, three sibling denials, hook events and SessionEnd archive asserted. |
-| WSL authenticated live attempt | Failed before model output: OAuth expired and could not refresh; no model tokens consumed. Login-status output alone was insufficient evidence. |
+| `CLAUDE_COMPLIANCE_LIVE=1 node tests/compliance-live.js` | 6 passed, 0 failed on Claude 2.1.263. Actual allowed Skill invocations and manually inspected synthetic responses; ordinary draft/records, quoted injection and four refusal categories. |
+| WSL authenticated live attempt | Failed before model output: OAuth expired and could not refresh; no model tokens consumed. That WSL installation was Claude 2.1.220, also below the new deployment minimum; select an accepted client version on the actual target. Login-status output alone was insufficient evidence. |
 | Additional concurrent-process stress | 200 binding pairs and 20 archive-retry pairs passed. |
+| Documented generator → renderer → manifest → `--verify` | Passed on a clean Windows checkout at `4f0a133`, using only `examples/matter-definition.json` and synthetic deployment values. |
+| OSV `POST https://api.osv.dev/v1/querybatch` with installed public PyPI package/version pairs from `python -m pip list --format=json` | 19 packages checked; 0 known advisory matches on 2026-09-07. Separate accessible GitHub Dependabot alerts list was empty. These are dated database observations, not a guarantee of unknown-vulnerability absence. |
 | LibreOffice PDF conversion and visual review | Both DOCX rendered; 31/30 pages; no text outside page bounds. Contents/table pagination corrected. |
-| Current real governance production preflight | Expected refusal; exact integrated result recorded before completion. |
+| `python scripts/preflight-validate.py --mode production dist/managed-settings.production.json` with real repository governance | Expected refusal, exit 1 with 77 errors on Windows: 3 absent installed hook paths, 1 unsupported host and 73 unresolved governance fields. The explicitly recorded disabled OAuth workflow is accepted on the verified date; missing client approvals remain blocked. |
 | Final pushed CI | Pending delivery; consult the PR checks for the final commit. |
 
 The mandatory suite covers configuration, subprocess errors, state persistence across processes, records retrieval, concurrency, archive failure/retry and release CLI integration. Native Windows necessarily skips POSIX-only filesystem cases; Linux executes them. Live model tests are optional in CI because they require an authenticated account and consume tokens. No database/migration, web UI, standalone formatter/linter/type-checker or compiled application exists; these checks are not reported as executed passes.
 
-Final CI, assessed commit and detailed counts are filled in before delivery. The report commit is a documentation snapshot; an embedded commit identifier names the code actually assessed rather than claiming a self-referential Git hash.
+The report commit is a documentation snapshot; the embedded commit identifier names the code actually assessed rather than claiming a self-referential Git hash. Final delivery CI also checks subsequent documentation commits.

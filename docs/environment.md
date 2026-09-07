@@ -49,6 +49,8 @@ CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 removes supported credential variables from c
 - CLAUDE_CODE_OAUTH_TOKEN is an optional GitHub Actions secret. It is not required for offline tests or a locally authenticated CLI.
 - ENABLE_CLAUDE_WORKFLOW=true is a GitHub repository variable required to activate the optional maintainer assistant, alongside trusted-actor permission checks. The recorded token rotation remains outstanding; see [OAuth decision](policy-decisions/oauth-token-management.md).
 
+The live GitHub workflow was also manually disabled during the review. An enable variable alone cannot restart it. Follow the OAuth decision's current evidence/rotation procedure before explicit re-enablement. Production preflight accepts a disabled disposition only with a same-day verified API observation matching this checkout and workflow hash.
+
 ## Single-matter definition example
 
 Copy [examples/matter-definition.json](../examples/matter-definition.json) to a controlled working directory. root is a selected matter directory, unlike CLAUDE_MATTER_ROOTS (its parent). aliases must remain inside that selected root; allowed_tooling_paths must be narrow runtime locations; allowed_domains must be exact hostnames. record_root=null uses the matter archive. Target-side realpath, mount visibility and network observation remain required; validation on another host cannot establish those facts.
