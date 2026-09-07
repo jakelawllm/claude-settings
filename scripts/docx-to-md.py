@@ -7,8 +7,12 @@ GitHub renders, so the two must be regenerated together.
 
 Requires python-docx.
 """
+import argparse
+import os
+from pathlib import Path
 import re
 import sys
+import tempfile
 
 import docx
 from docx.table import Table
@@ -28,6 +32,26 @@ def check_docx_features(doc):
     """
     body = doc.element.body
     blockers = []
+
+    unsupported = body.xpath(".//w:sdt | .//w:altChunk | .//w:drawing | .//w:pict | .//w:object | .//w:moveFrom | .//w:moveTo")
+    if unsupported:
+        blockers.append("content controls, embedded content, drawings or tracked moves detected; convert them to ordinary body text")
+    if body.xpath(".//w:tc//w:tbl"):
+        blockers.append("nested tables detected; flatten nested tables before conversion")
+    if body.xpath(".//w:hyperlink"):
+        blockers.append("hyperlinks detected; replace links with explicit visible text and URLs")
+    if body.xpath(".//w:footnoteReference | .//w:endnoteReference"):
+        blockers.append("footnote or endnote references detected; move note content into the body")
+    numbering = bool(body.xpath(".//w:numPr"))
+    for element in body.xpath(".//w:p"):
+        style = Paragraph(element, doc).style
+        seen = set()
+        while style is not None and style.style_id not in seen:
+            seen.add(style.style_id)
+            numbering = numbering or bool(style.element.xpath("./w:pPr/w:numPr"))
+            style = style.base_style
+    if numbering:
+        blockers.append("automatic numbering detected; convert list labels to explicit text")
 
     revisions = body.xpath(".//w:ins | .//w:del")
     if revisions:
@@ -54,8 +78,12 @@ def check_docx_features(doc):
     for section in doc.sections:
         for part in (section.header, section.first_page_header, section.even_page_header):
             header_text.extend(p.text.strip() for p in part.paragraphs if p.text.strip())
+            if part.tables or part._element.xpath(".//w:drawing | .//w:pict | .//w:sdt"):
+                blockers.append("header tables or embedded content detected; move content into the body")
         for part in (section.footer, section.first_page_footer, section.even_page_footer):
             footer_text.extend(p.text.strip() for p in part.paragraphs if p.text.strip())
+            if part.tables or part._element.xpath(".//w:drawing | .//w:pict | .//w:sdt"):
+                blockers.append("footer tables or embedded content detected; move content into the body")
     allowed_footer = re.compile(
         r"^(Policy on the Use of Artificial Intelligence in Legal Practice|"
         r"Protocol on the Use of Artificial Intelligence in Barristers' Practice)"
@@ -145,12 +173,21 @@ def render_paragraph(p):
 
 
 def main():
-    src, dst = sys.argv[1], sys.argv[2]
-    document = docx.Document(src)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("source", type=Path)
+    parser.add_argument("destination", type=Path)
+    args = parser.parse_args()
+    src, dst = args.source, args.destination
+    if src.resolve() == dst.resolve():
+        parser.error("source and destination must be different files")
     try:
+        document = docx.Document(src)
         check_docx_features(document)
     except ValueError as exc:
         print(f"ERROR: docx-to-md: {exc}", file=sys.stderr)
+        return 1
+    except Exception:
+        print("ERROR: docx-to-md: could not read the input DOCX", file=sys.stderr)
         return 1
 
     lines = [
@@ -178,8 +215,19 @@ def main():
             blank = False
         out.append(line)
 
-    with open(dst, "w", encoding="utf-8", newline="\n") as f:
-        f.write("\n".join(out).strip() + "\n")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n",
+                                         dir=dst.parent, delete=False) as f:
+            temporary = Path(f.name)
+            f.write("\n".join(out).strip() + "\n")
+        os.replace(temporary, dst)
+    except OSError:
+        print("ERROR: docx-to-md: could not write the output Markdown", file=sys.stderr)
+        return 1
+    finally:
+        if temporary is not None and temporary.exists():
+            temporary.unlink()
 
     print(f"wrote {dst}")
 

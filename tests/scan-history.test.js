@@ -48,7 +48,7 @@ function commitFileContent(dir, message, fileContent) {
 
 function scan(dir) {
   const r = spawnSync(
-    'python3', [SCANNER],
+    process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), [SCANNER],
     { cwd: dir, encoding: 'utf8', maxBuffer: 10 * 1024 * 1024 }
   );
   return { code: r.status, stdout: r.stdout, stderr: r.stderr, error: r.error };
@@ -72,6 +72,67 @@ function checkRejected(label, r) {
 }
 
 function run() {
+  for (const kind of ['filename', 'branch', 'tag']) {
+    const dir = path.join(TMP, 'metadata-' + kind);
+    makeRepo(dir);
+    const token = 'ghp_' + 'b'.repeat(30);
+    const opts = { cwd: dir, encoding: 'utf8' };
+    if (kind === 'filename') {
+      fs.writeFileSync(path.join(dir, token + '.txt'), 'ordinary content');
+      spawnSync('git', ['add', '-A'], opts);
+      spawnSync('git', ['commit', '-qm', 'metadata regression'], opts);
+    } else if (kind === 'branch') {
+      spawnSync('git', ['branch', token], opts);
+    } else {
+      spawnSync('git', ['tag', '-a', 'synthetic-tag', '-m', token], opts);
+    }
+    const result = scan(dir);
+    checkRejected(`${kind} disclosure detected`, result);
+    check(`${kind} disclosure is redacted`, !result.stdout.includes(token));
+  }
+  {
+    const dir = path.join(TMP, 'scanner-source-disclosure');
+    makeRepo(dir);
+    fs.mkdirSync(path.join(dir, 'scripts'));
+    fs.writeFileSync(path.join(dir, 'scripts', 'scan-history.py'), 'password="super-secret-value"');
+    spawnSync('git', ['add', '-A'], { cwd: dir });
+    spawnSync('git', ['commit', '-qm', 'scanner source regression'], { cwd: dir });
+    checkRejected('scanner source is not exempt', scan(dir));
+  }
+  {
+    const dir = path.join(TMP, 'message-control-character');
+    makeRepo(dir);
+    commitBody(dir, '\x1epassword="super-secret-value"');
+    checkRejected('commit control characters cannot hide a disclosure', scan(dir));
+    const shallow = path.join(TMP, 'shallow-clone');
+    const cloned = spawnSync('git', ['clone', '--depth', '1', require('url').pathToFileURL(dir).href, shallow], { encoding: 'utf8' });
+    check('shallow clone fixture created', cloned.status === 0);
+    const result = scan(shallow);
+    check('shallow history refuses to report a full-history pass', result.code === 1 && result.stdout.includes('--unshallow'));
+  }
+  for (const [name, content] of [
+    ['added-plus-prefix', '++password="super-secret-value"'],
+    ['allowed-domain-in-secret', 'password="super-secret-example.invalid-value"'],
+  ]) {
+    const dir = path.join(TMP, name);
+    makeRepo(dir);
+    commitFileContent(dir, 'regression case', content);
+    const result = scan(dir);
+    checkRejected(name, result);
+    check(`${name} output is redacted`, !result.stdout.includes('super-secret'));
+  }
+  {
+    const dir = path.join(TMP, 'secret-filename');
+    makeRepo(dir);
+    const token = 'ghp_' + 'a'.repeat(30);
+    fs.writeFileSync(path.join(dir, token + '.txt'), 'password="super-secret-value"');
+    const opts = { cwd: dir, encoding: 'utf8' };
+    spawnSync('git', ['add', '-A'], opts);
+    spawnSync('git', ['commit', '-q', '-m', 'file location regression'], opts);
+    const result = scan(dir);
+    checkRejected('credential in filename still flags content', result);
+    check('credential in filename is redacted', !result.stdout.includes(token));
+  }
   const owner = 'octocat';
   const repo = 'hello-world';
   const urlCompare = `https://github.com/${owner}/${repo}/compare/${SHA}...${SHA}`;

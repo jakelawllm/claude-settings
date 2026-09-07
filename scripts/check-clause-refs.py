@@ -22,12 +22,16 @@ POLICY = ROOT / "ai-policy-legal-practice-template.md"
 SOURCES = [
     ROOT / "README.md",
     ROOT / "skills" / "ai-policy-compliance" / "SKILL.md",
+    ROOT / "managed-settings.json",
+    ROOT / "settings.json",
+    POLICY,
 ]
 # The barristers protocol numbers its clauses independently of the practice
 # policy, so its own cross-references are checked against itself.
 SELF_CONTAINED = [ROOT / "ai-protocol-barristers-chambers.md"]
 
 CLAUSE = re.compile(r"clause\s+(\d+(?:\.\d+)?)", re.IGNORECASE)
+SUBCLAUSE_REF = re.compile(r"clause\s+(\d+(?:\.\d+)?\([a-z]+\))", re.IGNORECASE)
 SCHEDULE = re.compile(r"Schedule\s+(\d+)")
 MAJOR = re.compile(r"^## (\d+)\s\s(.+)$", re.MULTILINE)
 SUB = re.compile(r"^\*\*(\d+\.\d+)\*\*\s+(.+)$", re.MULTILINE)
@@ -92,26 +96,50 @@ EXPECTED_HEADINGS = {
 
 def clause_index(text: str) -> dict[str, str]:
     found: dict[str, str] = {}
-    for num, heading in MAJOR.findall(text):
-        found[num] = heading.strip()
-    for num, heading in SUB.findall(text):
+    for num, heading in MAJOR.findall(text) + SUB.findall(text):
+        if num in found:
+            raise ValueError(f"duplicate clause identifier {num}")
         found[num] = heading.strip()
     return found
 
 
 def schedule_index(text: str) -> set[str]:
-    return set(re.findall(r"^## Schedule (\d+)\s", text, re.MULTILINE))
+    numbers = re.findall(r"^## Schedule (\d+)\s", text, re.MULTILINE)
+    if len(numbers) != len(set(numbers)):
+        raise ValueError("duplicate schedule identifier")
+    return set(numbers)
+
+
+def subclause_index(text: str) -> set[str]:
+    result, current = set(), None
+    for line in text.splitlines():
+        clause = SUB.match(line)
+        if clause:
+            current = clause.group(1)
+        elif line.startswith("## "):
+            current = None
+        match = re.match(r"^- \*\*\(([a-z]+)\)\*\*", line)
+        if current and match:
+            key = f"{current}({match.group(1)})"
+            if key in result:
+                raise ValueError(f"duplicate subclause identifier {key}")
+            result.add(key)
+    return result
 
 
 def check_sources(
-    sources: list[pathlib.Path], clauses: dict[str, str], schedules: set[str]
+    sources: list[pathlib.Path], clauses: dict[str, str], schedules: set[str], subclauses: set[str] | None = None
 ) -> list[str]:
     failures: list[str] = []
     for src in sources:
         if not src.exists():
+            failures.append(f"{src.name}: required reference source is missing")
             continue
         text = src.read_text(encoding="utf8")
         rel = src.relative_to(ROOT).as_posix()
+        for ref in sorted(set(SUBCLAUSE_REF.findall(text))):
+            if ref not in (subclauses or set()):
+                failures.append(f"{rel}: subclause {ref} does not exist in the policy")
         for ref in sorted(set(CLAUSE.findall(text)), key=lambda s: [int(x) for x in s.split(".")]):
             if ref not in clauses:
                 failures.append(f"{rel}: clause {ref} does not exist in the policy")
@@ -133,15 +161,20 @@ def main() -> int:
     clauses = clause_index(policy)
     schedules = schedule_index(policy)
 
-    failures = check_sources(SOURCES, clauses, schedules)
+    failures = check_sources(SOURCES, clauses, schedules, subclause_index(policy))
 
     for doc in SELF_CONTAINED:
         if not doc.exists():
+            failures.append(f"{doc.name}: required policy document is missing")
             continue
         text = doc.read_text(encoding="utf8")
         rel = doc.relative_to(ROOT).as_posix()
         own = clause_index(text)
         own_sched = schedule_index(text)
+        own_sub = subclause_index(text)
+        for ref in sorted(set(SUBCLAUSE_REF.findall(text))):
+            if ref not in own_sub:
+                failures.append(f"{rel}: subclause {ref} does not exist in that document")
         for ref in sorted(set(CLAUSE.findall(text)), key=lambda s: [int(x) for x in s.split(".")]):
             if ref not in own:
                 failures.append(f"{rel}: clause {ref} does not exist in that document")
@@ -163,4 +196,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except ValueError as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(1)

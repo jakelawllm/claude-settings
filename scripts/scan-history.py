@@ -24,9 +24,11 @@ It also looks for identifying detail, because this repository is a template
 published by a law practice: a firm name or an internal host committed once and
 removed later still sits in the history, readable by anyone.
 
-It scans three things: added lines across the full diff history, commit
-messages (subject + body), and high-entropy runs that look like an unlabelled
-secret even when they match no known credential shape.
+It scans added lines across full diff history, commit messages, historical
+filenames, ref names and annotated tag messages. Its long-character-run rule
+is a heuristic, not a mathematical entropy calculation. Office payloads are
+covered separately by scan-docx-xml.py --history. Arbitrary binary formats and
+obfuscated credentials require a maintained scanner/platform push protection.
 
 Findings are never printed with the matched text itself -- only the label and
 location -- so running this scanner cannot itself leak the thing it found.
@@ -68,7 +70,6 @@ ENTROPY = [
 ALL_PATTERNS = SECRETS + IDENTIFYING + ENTROPY
 
 PATH_ALLOW = [
-    re.compile(r"^scripts/scan-history\.py$"),  # this file states the patterns
     # Test fixtures deliberately state scanner patterns and exercise them;
     # the scanner must not flag its own negative-test corpus.
     re.compile(r"^tests/scan-docx-xml\.test\.js$"),
@@ -76,8 +77,7 @@ PATH_ALLOW = [
 ]
 
 ALLOW_MATCH = [
-    re.compile(r"example\.invalid"),
-    re.compile(r"nas\.example"),
+    re.compile(r"^\\\\nas\.example\\[A-Za-z0-9_.$-]+(?:\\[^\s]*)?$"),
     # Sandbox schema field lists contain long slash-separated identifier runs;
     # they are documented field names, not unlabelled credentials.
     re.compile(r"filesystem\.denyRead/allowRead/allowWrite/allowManagedReadPathsOnly"),
@@ -115,11 +115,18 @@ GITHUB_COMMIT_URL = re.compile(
     _GITHUB_URL_START + r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+"
     r"/commit/([0-9a-f]{40})(?=$|[\s),.;:\]?#])"
 )
-_HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d)? \+(\d+)(?:,\d+)? @@")
+_HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
+def safe_location(value):
+    """Never echo a credential embedded in an attacker-controlled filename."""
+    for _, pattern in ALL_PATTERNS:
+        value = re.sub(pattern, "[REDACTED]", value)
+    return re.sub(r"[\x00-\x1f\x7f]", "?", value)
 
 
 def path_is_allowed(filename):
-    """Return true for files whose own source necessarily states scanner patterns."""
+    """Return true for the explicitly synthetic negative-test corpora."""
     return any(a.search(filename) for a in PATH_ALLOW)
 
 
@@ -194,8 +201,18 @@ def match_is_allowed(filename, content, match, source="diff", label=""):
     The Dependabot URL allowance is scoped to commit messages only.
     """
     match_text = match.group(0)
-    if any(a.search(match_text) for a in ALLOW_MATCH):
+    if any(a.fullmatch(match_text) for a in ALLOW_MATCH):
         return True
+    # Scan this scanner too. Only its two literal synthetic UNC comparisons
+    # need an exception; future credentials added elsewhere must still fail.
+    if filename == "scripts/scan-history.py" and label == "UNC path":
+        slash = chr(92)
+        example = slash * 2 + "server" + slash + "share"
+        if content.strip() in {
+            f'and match_text == r"{example}"',
+            f'== r"Accepts Windows drive letters (C:{slash}), UNC ({example}), and POSIX (/)."',
+        }:
+            return True
     # Historical path-parser docstrings use this exact conventional synthetic
     # UNC example. Match the full line: the identifying regex may stop after
     # the share name before an unrecognised path character.
@@ -259,16 +276,23 @@ def iter_added_lines(diff_text):
     """
     filename = ""
     lineno = 0
+    in_hunk = False
     for line in diff_text.splitlines():
-        if line.startswith("+++ b/"):
+        if line.startswith("diff --git "):
+            filename = ""
+            lineno = 0
+            in_hunk = False
+            continue
+        if line.startswith("+++ b/") and not in_hunk:
             filename = line[6:]
             lineno = 0
             continue
         m = _HUNK_HEADER.match(line)
         if m:
             lineno = int(m.group(1)) - 1
+            in_hunk = True
             continue
-        if line.startswith(("+++", "---")):
+        if not in_hunk:
             continue
         if line.startswith("+"):
             lineno += 1
@@ -282,7 +306,7 @@ def iter_added_lines(diff_text):
 def scan_diff():
     try:
         diff = subprocess.run(
-            ["git", "log", "-p", "--all", "--no-color"],
+            ["git", "-c", "core.quotePath=false", "log", "--format=", "-p", "--all", "--full-history", "-m", "--no-color", "--no-ext-diff", "--no-textconv"],
             capture_output=True, text=True, errors="replace", check=True,
         ).stdout
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
@@ -291,7 +315,7 @@ def scan_diff():
 
     hits = []
     for filename, lineno, content in iter_added_lines(diff):
-        location = f"{filename}:{lineno}"
+        location = f"{safe_location(filename)}:{lineno}"
         if path_is_allowed(filename):
             continue
         for label, pattern in ALL_PATTERNS:
@@ -305,14 +329,12 @@ def scan_diff():
 def scan_commit_messages():
     """Scan commit subjects and bodies, not just diff content.
 
-    Uses unit-separator (\x1f) and record-separator (\x1e) delimiters so a
-    multi-line body can't be confused with the next commit's hash, and so the
-    hash itself (40 hex chars, which would otherwise trip the entropy check)
-    is never part of the scanned text.
+    NUL framing keeps ordinary message control characters from becoming record
+    separators. Reject malformed framing rather than skipping unscanned text.
     """
     try:
         log = subprocess.run(
-            ["git", "log", "--all", "--format=%H%x1f%s%x1f%b%x1e"],
+            ["git", "log", "--all", "--format=%H%x00%B%x00"],
             capture_output=True, text=True, errors="replace", check=True,
         ).stdout
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
@@ -320,14 +342,17 @@ def scan_commit_messages():
         return None
 
     hits = []
-    for record in log.split("\x1e"):
-        record = record.strip("\n")
-        if not record:
-            continue
-        parts = record.split("\x1f")
-        commit_hash = parts[0].strip()
-        message = "\n".join(parts[1:]) if len(parts) > 1 else ""
-        short = commit_hash[:12] if commit_hash else "unknown"
+    records = log.split("\0")
+    if records[-1].strip() or len(records) % 2 != 1:
+        print("could not parse complete commit message history")
+        return None
+    for index in range(0, len(records) - 1, 2):
+        commit_hash = records[index].strip()
+        message = records[index + 1]
+        if not re.fullmatch(r"[0-9a-f]{40,64}", commit_hash):
+            print("could not parse complete commit message history")
+            return None
+        short = commit_hash[:12]
         location = f"commit {short}"
         for text_line in message.splitlines():
             for label, pattern in ALL_PATTERNS:
@@ -340,7 +365,60 @@ def scan_commit_messages():
     return hits
 
 
+def scan_metadata():
+    """Inspect historical paths, ref names and annotated tag messages."""
+    try:
+        objects = subprocess.run(["git", "rev-list", "--objects", "--all"], capture_output=True,
+                                 text=True, encoding="utf-8", errors="replace", check=True).stdout
+        refs = subprocess.run(["git", "for-each-ref", "--format=%(objecttype)%00%(objectname)%00%(refname)%00%(contents)%00"],
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        print("could not read complete repository metadata")
+        return None
+    values = []
+    for line in objects.splitlines():
+        oid, _, filename = line.partition(" ")
+        if filename:
+            values.append((filename, f"object {oid[:12]} path", "diff"))
+    records = refs.split("\0")
+    if records[-1].strip() or len(records) % 4 != 1:
+        print("could not parse complete repository metadata")
+        return None
+    for index in range(0, len(records) - 1, 4):
+        kind, oid, name, content = records[index:index + 4]
+        if not re.fullmatch(r"[0-9a-f]{40,64}", oid):
+            print("could not parse complete repository metadata")
+            return None
+        values.append((name, f"object {oid[:12]} ref", "diff"))
+        if kind.strip() == "tag":
+            values.append((content, f"object {oid[:12]} tag message", "commit_message"))
+    hits = []
+    for value, location, source in values:
+        for line in value.splitlines():
+            for label, pattern in ALL_PATTERNS:
+                for match in re.finditer(pattern, line):
+                    # Ordinary ref prefixes can exceed forty characters across
+                    # path separators. Check each ref component for this coarse
+                    # heuristic; credential-shaped rules still inspect the whole.
+                    if label == ENTROPY_LABEL and location.endswith(" ref") and not any(
+                        re.fullmatch(ENTROPY_PATTERN, part) for part in match.group(0).split("/")
+                    ):
+                        continue
+                    if not match_is_allowed("", line, match, source=source, label=label):
+                        hits.append((label, location))
+    return hits
+
+
 def main() -> int:
+    try:
+        shallow = subprocess.run(["git", "rev-parse", "--is-shallow-repository"],
+                                 capture_output=True, text=True, check=True).stdout.strip()
+        if shallow != "false":
+            print("ERROR: full history unavailable; fetch with --unshallow before scanning")
+            return 1
+    except (OSError, subprocess.CalledProcessError):
+        print("ERROR: could not establish complete Git history")
+        return 1
     diff_hits = scan_diff()
     if diff_hits is None:
         return 1
@@ -349,7 +427,10 @@ def main() -> int:
     if message_hits is None:
         return 1
 
-    hits = diff_hits + message_hits
+    metadata_hits = scan_metadata()
+    if metadata_hits is None:
+        return 1
+    hits = diff_hits + message_hits + metadata_hits
 
     if hits:
         print(f"{len(hits)} potential disclosure(s) in history:")

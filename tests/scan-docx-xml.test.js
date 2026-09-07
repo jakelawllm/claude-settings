@@ -65,10 +65,9 @@ function u32(n) {
   return b;
 }
 
-function makeDocx(name, xml) {
-  const fileName = 'word/document.xml';
+function makeDocx(name, xml, fileName = 'word/document.xml') {
   const fileNameBuf = Buffer.from(fileName, 'utf8');
-  const content = Buffer.from(xml, 'utf8');
+  const content = Buffer.isBuffer(xml) ? xml : Buffer.from(`<root xmlns:w="urn:test">${xml}</root>`, 'utf8');
   const compressed = zlib.deflateRawSync(content);
   const { time, date } = dosDateTime(new Date('2026-08-04T12:00:00Z'));
   const crc = crc32(content);
@@ -97,7 +96,7 @@ function makeDocx(name, xml) {
 }
 
 function run(file) {
-  const r = spawnSync('python3', [SCRIPT, file], { encoding: 'utf8' });
+  const r = spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), [SCRIPT, file], { encoding: 'utf8' });
   return { code: r.status, stdout: r.stdout, stderr: r.stderr };
 }
 
@@ -120,6 +119,58 @@ const privateIpBesideAllowed = makeDocx(
 const t3 = run(privateIpBesideAllowed);
 check('04 scanner rejects private IP beside allowed value', t3.code, 1);
 check('05 scanner reports private IP', t3.stdout.includes('Private IPv4 (10.x.x.x)'), true);
+
+const token = 'ghp_' + 'a'.repeat(30);
+for (const [name, xml, label] of [
+  ['split-runs', `<w:t>${token.slice(0, 12)}</w:t><w:t>${token.slice(12)}</w:t>`, 'GitHub token'],
+  ['escaped-assignment', '<w:t>password=&quot;super-secret-value&quot;</w:t>', 'Generic assignment'],
+  ['domain-in-secret', '<w:t>password="secret-example.invalid-value"</w:t>', 'Generic assignment'],
+  ['attribute', `<item target="${token}"/>`, 'GitHub token'],
+  ['utf16', Buffer.from(`<?xml version="1.0" encoding="utf-16"?><root>${token}</root>`, 'utf16le'), 'GitHub token'],
+]) {
+  const result = run(makeDocx(name + '.docx', xml));
+  check(`${name} is rejected`, result.code, 1);
+  check(`${name} reports the matching rule`, result.stdout.includes(label), true);
+  check(`${name} findings never print values`, result.stdout.includes(token) || result.stdout.includes('super-secret'), false);
+}
+const sensitiveName = makeDocx(token + '.docx', `<w:t>${token}</w:t>`, token + '.xml');
+const named = run(sensitiveName);
+check('credential in document and member names is redacted', named.stdout.includes(token), false);
+check('named member still fails', named.code, 1);
+
+for (const [name, xml] of [
+  ['malformed', Buffer.from('<broken>')],
+  ['entity', Buffer.from('<!DOCTYPE root [<!ENTITY x "text">]><root>&x;</root>')],
+  ['oversized', '<w:t>' + 'a'.repeat(16 * 1024 * 1024) + '</w:t>'],
+]) {
+  check(`${name} fails closed`, run(makeDocx(name + '.docx', xml)).code, 1);
+}
+check('missing explicit input fails', run(path.join(TMP, 'missing.docx')).code, 2);
+const badType = path.join(TMP, 'not-office.txt');
+fs.writeFileSync(badType, 'text');
+check('non-Office explicit input fails', run(badType).code, 2);
+
+const historyDir = path.join(TMP, 'history');
+fs.mkdirSync(historyDir);
+function git(args) {
+  const r = spawnSync('git', args, { cwd: historyDir, encoding: 'utf8' });
+  if (r.status !== 0) throw new Error('synthetic git fixture failed');
+}
+git(['init', '-q']);
+git(['config', 'user.email', 'test@example.invalid']);
+git(['config', 'user.name', 'Test']);
+git(['config', 'commit.gpgsign', 'false']);
+const historicDoc = path.join(historyDir, 'policy.docx');
+fs.copyFileSync(secretBesideAllowed, historicDoc);
+git(['add', '.']);
+git(['commit', '-qm', 'synthetic initial document']);
+fs.copyFileSync(allowedOnly, historicDoc);
+git(['add', '.']);
+git(['commit', '-qm', 'synthetic cleaned document']);
+const historic = spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), [SCRIPT, '--history'], { cwd: historyDir, encoding: 'utf8' });
+check('removed Office secrets are found in history', historic.status, 1);
+check('historical findings identify the blob', historic.stdout.includes('blob-'), true);
+check('historical findings are redacted', historic.stdout.includes('super-secret-value'), false);
 
 fs.rmSync(TMP, { recursive: true, force: true });
 console.log(`\npassed=${pass} failed=${fail}`);
