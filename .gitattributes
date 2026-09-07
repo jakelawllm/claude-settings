@@ -1,5 +1,10 @@
 # These bytes are hashed or generated; Git must not rewrite them on Windows.
 schemas/*.json text eol=lf
 schemas/*.sha256 text eol=lf
+*.json text eol=lf
+hooks/*.js text eol=lf
+skills/**/SKILL.md text eol=lf
+requirements*.txt text eol=lf
+.github/workflows/*.yml text eol=lf
 ai-policy-legal-practice-template.md text eol=lf
 ai-protocol-barristers-chambers.md text eol=lf
