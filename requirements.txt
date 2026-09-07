@@ -1,2 +1,4 @@
 check-jsonschema==0.37.4
 python-docx==1.2.0
+# click's Windows dependency must be present when compiling the lock on Linux.
+colorama==0.4.6 ; sys_platform == "win32"
