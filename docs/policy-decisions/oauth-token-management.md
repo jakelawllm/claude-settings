@@ -79,3 +79,11 @@ Keep `CLAUDE_CODE_OAUTH_TOKEN` only if all of the following are recorded:
 **After Option B is fully recorded (every field non-PENDING):** keep `CLAUDE_CODE_OAUTH_TOKEN` only while the fields above remain accurate, and schedule the recorded rotation. **Operational fields filled 2026-08-14.** First rotation is due immediately on 2026-08-14 (`never rotated`); token owner should rotate on or before the next-rotation-due date and update **Last rotated** / **Next rotation due** after each rotation.
 
 SUP-05 static-token exception is complete for internal beta. Production go for external/client use remains blocked by other owner-dependent gates (registers, data-flow, E2E, OS isolation) and by the README beta disclaimer.
+
+## 2026-09-07 remediation addendum
+
+The historical Option B approval and rotation dates above are preserved. They do not establish that rotation happened. The recorded first rotation date has passed and the record still says never rotated.
+
+The current workflow is disabled unless ENABLE_CLAUDE_WORKFLOW=true is explicitly set, restricts invocations to trusted associations and verifies actual repository write permission before checkout. Unused id-token: write was removed. The action receives the explicit read-only github.token and a fixed analysis prompt; findings appear in action output, not an interactive write-capable comment workflow. Before enabling this optional workflow, the token owner must perform issuer-side revocation/rotation, update Last rotated and Next rotation due, and test the replacement without exposing it. Offline verification and locally authenticated CLI tests do not depend on this workflow.
+
+The current engineering assessment is [INTERNAL_MVP_READINESS_REPORT.md](../INTERNAL_MVP_READINESS_REPORT.md). This addendum supersedes statements above that the current workflow is unchanged or that filled fields prove an operationally current exception.

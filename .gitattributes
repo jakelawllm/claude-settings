@@ -1,0 +1,5 @@
+# These bytes are hashed or generated; Git must not rewrite them on Windows.
+schemas/*.json text eol=lf
+schemas/*.sha256 text eol=lf
+ai-policy-legal-practice-template.md text eol=lf
+ai-protocol-barristers-chambers.md text eol=lf

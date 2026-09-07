@@ -1,0 +1,9 @@
+{
+  "matter_id": "synthetic-smith",
+  "name": "Smith",
+  "root": "/synthetic-matters/Smith",
+  "aliases": [],
+  "allowed_tooling_paths": ["/usr/bin", "/opt/claude"],
+  "allowed_domains": ["api.anthropic.com", "synthetic-otel.example.invalid"],
+  "record_root": null
+}

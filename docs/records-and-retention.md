@@ -32,3 +32,9 @@ The managed settings route OTEL metrics and logs to the firm's collector. This r
 ## What is *not* a records system
 
 Telemetry metrics and tool events are not a verbatim evidentiary record. The JSONL transcript in the matter archive may be the closest available record of what was sent and received, but it is subject to the limitations above.
+
+## Current implementation note (2026-09-07)
+
+The hook emits a JSONL file only. It does not emit the production archive event described in records-schema.md and no records-service adapter is shipped. An external consumer must construct the event and validate it. Warn mode can archive a cross-matter conversation under its first binding and must be restricted to synthetic tests.
+
+Copy names include the full hashed session identity. Central archives include a full matter-identity hash. Copies are published without overwriting existing data; identical retries are idempotent. The filesystem must support hard links; otherwise archival reports a failure. Follow [operations](operations.md) to preserve the source transcript, recover by verified identity and handle legacy central archives. Restrictive POSIX creation modes are tested on POSIX; Windows ACL policy remains the operator's responsibility.

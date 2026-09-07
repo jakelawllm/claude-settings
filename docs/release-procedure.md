@@ -22,7 +22,7 @@ python3 scripts/render-production-settings.py \
   --firm-name "<practice name>" \
   --org-uuid "<Claude org UUID>" \
   --matter-roots "<absolute matter root>[;<alias>]" \
-  --otel-endpoint "https://<collector>/v1/traces" \
+  --otel-endpoint "https://<collector>" \
   --sandbox-policy dist/sandbox-policy.json
 
 python3 scripts/preflight-validate.py --mode production dist/managed-settings.production.json
@@ -33,15 +33,15 @@ If telemetry is deliberately disabled, use `--disable-telemetry` and record the 
 ## 3. Generate and verify the manifest
 
 ```bash
-python3 scripts/generate-release-manifest.py \
+python3 scripts/generate-release-manifest.py --claude-code-version "<actual tested version>" \
   --output dist/release-manifest.json \
   --production-settings dist/managed-settings.production.json \
   --sandbox-policy dist/sandbox-policy.json
 
-# If the working tree is dirty and the deployment process deliberately accepts that state:
+# Development evidence only: --allow-dirty must never label a deployable release.
 #   python3 scripts/generate-release-manifest.py --allow-dirty ...
 
-python3 scripts/generate-release-manifest.py \
+python3 scripts/generate-release-manifest.py --claude-code-version "<actual tested version>" \
   --verify \
   --output dist/release-manifest.json \
   --production-settings dist/managed-settings.production.json \
@@ -52,7 +52,7 @@ The manifest records hashes of the hook, settings template, rendered production 
 
 ## 4. Run manual release gates
 
-Run these on the certified platform path for the release candidate:
+Run these on the target container platform path after host acceptance for the release candidate:
 
 1. `claude doctor`, confirming managed settings are loaded.
 2. `/status` in a real session, confirming managed settings and hooks are in force.
@@ -84,6 +84,7 @@ The release owner records approval only after every automated gate, manual gate 
 managed-settings.json
 hooks/matter-guard.js
 skills/ai-policy-compliance/SKILL.md
+sandbox-policy.json
 release-manifest.json
 ```
 

@@ -31,3 +31,7 @@ Preflight validation checks that a completion record exists; it does not indepen
 ## Scope
 
 Completion of this register does not itself authorise production go. The production preflight, release checklist, README beta disclaimer and all other governance registers remain controlling. Internal-beta waivers do not satisfy production requirements.
+
+## 2026-09-07 engineering evidence boundary
+
+See [current readiness](INTERNAL_MVP_READINESS_REPORT.md) for executed synthetic checks. This register intentionally remains uncompleted: local hook invocation and a JSONL copy are not proof of the installed managed bundle, signature, external records service or host isolation. Do not copy synthetic fixture approvals into these entries.
