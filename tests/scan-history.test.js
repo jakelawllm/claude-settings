@@ -74,6 +74,8 @@ function checkRejected(label, r) {
 function run() {
   const baseline = 'e25608d975ef58d31bd4ff7984eabb0622046b22';
   const historical = '29e76ac949c47104185aee0ffa16569ea6a6c862';
+  const workflowDigest = '649d3a459ff0e903e237d9a8924927344be095d58ac2681cce914149ee0aeb90';
+  const workflowEvidence = 'docs/policy-decisions/oauth-token-management.md';
   for (const [name, filename, content, allowed] of [
     ['report-baseline', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `**Baseline:** ${baseline}`, true],
     ['report-historical', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `Historical commit ${historical}`, true],
@@ -83,6 +85,12 @@ function run() {
     ['adjacent-credential', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `Baseline ${baseline}; password="super-secret-value"`, false],
     ['adjacent-entropy', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `Baseline ${baseline}; extra=${'2'.repeat(40)}`, false],
     ['credential-shaped', 'docs/INTERNAL_MVP_READINESS_REPORT.md', `github_pat_${baseline}`, false],
+    ['workflow-digest', workflowEvidence, `- Workflow SHA-256 (LF): ${workflowDigest}`, true],
+    ['workflow-wrong-document', 'docs/unreviewed.md', `Digest ${workflowDigest}`, false],
+    ['workflow-unreviewed-digest', workflowEvidence, `- Workflow SHA-256 (LF): ${'3'.repeat(64)}`, false],
+    ['workflow-adjacent-credential', workflowEvidence, `Digest ${workflowDigest}; password="super-secret-value"`, false],
+    ['workflow-adjacent-entropy', workflowEvidence, `Digest ${workflowDigest}; extra=${'4'.repeat(64)}`, false],
+    ['workflow-credential-shaped', workflowEvidence, `github_pat_${workflowDigest}`, false],
   ]) {
     const dir = path.join(TMP, 'reviewed-sha-' + name);
     makeRepo(dir);
@@ -92,7 +100,13 @@ function run() {
     const opts = { cwd: dir, encoding: 'utf8' };
     spawnSync('git', ['add', '-A'], opts);
     spawnSync('git', ['commit', '-qm', 'reviewed reference regression'], opts);
-    (allowed ? checkAllowed : checkRejected)(`reviewed commit scope: ${name}`, scan(dir));
+    (allowed ? checkAllowed : checkRejected)(`reviewed public reference scope: ${name}`, scan(dir));
+  }
+  {
+    const dir = path.join(TMP, 'workflow-digest-commit-message');
+    makeRepo(dir);
+    commitBody(dir, `Workflow digest ${workflowDigest}`);
+    checkRejected('reviewed workflow digest is not exempt in commit messages', scan(dir));
   }
   for (const kind of ['filename', 'branch', 'tag']) {
     const dir = path.join(TMP, 'metadata-' + kind);

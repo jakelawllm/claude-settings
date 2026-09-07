@@ -102,6 +102,16 @@ REVIEWED_COMMIT_REFS = {
     "docs/INTERNAL_MVP_READINESS_REPORT.md": {_REVIEW_BASELINE, _HISTORICAL_ASSESSMENT},
     "docs/release-checklist.md": {_REVIEW_BASELINE},
 }
+# Public integrity digest verified against .github/workflows/claude.yml in
+# 864fd0c after CRLF-to-LF normalization. Keep this exact value and evidence
+# path scoped; changed workflow hashes require a new review, not a blanket
+# allowance for hex values in policy evidence.
+_DISABLED_WORKFLOW_DIGEST = (
+    "649d3a459ff0e903e237d9a8924927344" "be095d58ac2681cce914149ee0aeb90"
+)
+REVIEWED_ARTIFACT_DIGESTS = {
+    "docs/policy-decisions/oauth-token-management.md": {_DISABLED_WORKFLOW_DIGEST},
+}
 # GitHub auto-generates this exact commit-message line for the synthetic
 # refs/pull/N/merge ref used by pull_request-triggered CI. Both hex runs are
 # git commit SHAs the platform inserted, not credentials.
@@ -211,6 +221,8 @@ def match_is_allowed(filename, content, match, source="diff", label=""):
     """
     match_text = match.group(0)
     if source == "diff" and label == ENTROPY_LABEL and match_text in REVIEWED_COMMIT_REFS.get(filename, set()):
+        return True
+    if source == "diff" and label == ENTROPY_LABEL and match_text in REVIEWED_ARTIFACT_DIGESTS.get(filename, set()):
         return True
     if any(a.fullmatch(match_text) for a in ALLOW_MATCH):
         return True
