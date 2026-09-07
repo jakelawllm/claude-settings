@@ -1,5 +1,5 @@
 {
-  "_fixture_comment": "SYNTHETIC production fixture for CFG-02 mutation testing. Every value is a clearly synthetic placeholder: UUIDs use RFC 4122 test ranges, matter roots under /synthetic-matters, OTLP endpoint on localhost. This file MUST pass production preflight; introducing a real defect must cause CI to fail.",
+  "_fixture_comment": "SYNTHETIC bundle validation fixture only. The guard uses the parent /synthetic-matters registry; the sandbox exposes only its Smith child. No real credentials, client data or deployment approvals are present. Production preflight requires explicit --evidence-root test-fixtures and rejects native Windows.",
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
@@ -10,13 +10,19 @@
     "OTEL_LOGS_EXPORTER": "otlp",
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://synthetic-otel.example.invalid:4318",
-    "CLAUDE_MATTER_ROOTS": "/synthetic-matters/Smith;/synthetic-matters/Jones",
-    "CLAUDE_MATTER_MODE": "enforce"
+    "CLAUDE_MATTER_ROOTS": "/synthetic-matters",
+    "CLAUDE_MATTER_MODE": "enforce",
+    "OTEL_LOG_USER_PROMPTS": "0",
+    "OTEL_LOG_ASSISTANT_RESPONSES": "0",
+    "OTEL_LOG_TOOL_DETAILS": "0",
+    "OTEL_LOG_TOOL_CONTENT": "0",
+    "OTEL_LOG_RAW_API_BODIES": "0",
+    "CLAUDE_CODE_SUBPROCESS_ENV_SCRUB": "1"
   },
   "cleanupPeriodDays": 7,
   "feedbackSurveyRate": 0,
   "autoUpdatesChannel": "stable",
-  "requiredMinimumVersion": "2.1.219",
+  "requiredMinimumVersion": "2.1.251",
   "requiredMaximumVersion": "2.1.300",
   "forceLoginMethod": "claudeai",
   "forceLoginOrgUUID": "00000000-0000-4000-8000-000000000001",
@@ -33,7 +39,10 @@
   "disableMobileSimulatorTools": true,
   "channelsEnabled": false,
   "strictKnownMarketplaces": [
-    { "source": "github", "repo": "anthropics/claude-plugins-official" }
+    {
+      "source": "github",
+      "repo": "anthropics/claude-plugins-official"
+    }
   ],
   "enableAllProjectMcpServers": false,
   "allowManagedMcpServersOnly": true,
@@ -122,13 +131,93 @@
     "allowUnsandboxedCommands": false,
     "filesystem": {
       "allowManagedReadPathsOnly": true,
-      "denyRead": ["/", "~"],
-      "allowRead": ["/synthetic-matters/Smith", "/synthetic-matters/Jones", "/usr/bin", "/opt/claude"],
-      "allowWrite": ["/synthetic-matters/Smith", "/synthetic-matters/Jones", "/tmp/claude-session"]
+      "denyRead": [
+        "/",
+        "~"
+      ],
+      "allowRead": [
+        "/synthetic-matters/Smith",
+        "/usr/bin",
+        "/opt/claude"
+      ],
+      "allowWrite": [
+        "/synthetic-matters/Smith",
+        "/tmp/claude-session"
+      ]
     },
     "network": {
       "allowManagedDomainsOnly": true,
-      "allowedDomains": ["api.anthropic.com", "synthetic-otel.example.invalid"]
+      "allowedDomains": [
+        "api.anthropic.com",
+        "synthetic-otel.example.invalid"
+      ],
+      "allowLocalBinding": false
+    },
+    "credentials": {
+      "files": [
+        {
+          "path": "~/.aws",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.ssh",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.config/gcloud",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.azure",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.kube",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.gnupg",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.netrc",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.git-credentials",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.npmrc",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.pypirc",
+          "mode": "deny"
+        }
+      ],
+      "envVars": [
+        {
+          "name": "GITHUB_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "NPM_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_ACCESS_KEY_ID",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_SECRET_ACCESS_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "mode": "deny"
+        }
+      ]
     }
   }
 }

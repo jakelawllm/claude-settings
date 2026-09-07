@@ -18,11 +18,11 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
-import tempfile
+import posixpath
 from pathlib import Path, PurePosixPath
 from typing import Any
+from release_validation import atomic_write_json, valid_posix_path, valid_domain
 
 REQUIRED_FIELDS = [
     "matter_id",
@@ -89,16 +89,15 @@ def contains_placeholder(value: str) -> str | None:
 def canonicalize_posix(path: str) -> str:
     """Normalise a POSIX path for containment checks.
 
-    Resolves symlinks where the relevant path components exist, and otherwise
-    still collapses . and .. components for synthetic matter-registry paths that
-    may not be mounted on the build host.
+    The build host is not the target namespace. Symlinks must be resolved and
+    checked by the target launcher, not by this static generator.
     """
     if path.startswith("~"):
         # Expand only the literal home marker for comparison; do not use the
         # build host's home directory as a production value.
         expanded = path.replace("~", "/home/_matter_home", 1)
     else:
-        expanded = os.path.realpath(path)
+        expanded = posixpath.normpath(path)
     pure = PurePosixPath(expanded)
     parts: list[str] = []
     for part in pure.parts:
@@ -235,6 +234,23 @@ def validate_matter_definition(definition: dict[str, Any]) -> list[str]:
             elif not is_absolute_posix(record_root):
                 errors.append(f"record_root must be an absolute POSIX path: {record_root}")
 
+    for label, paths in (("root", [root]), ("aliases", aliases),
+                         ("allowed_tooling_paths", allowed_tooling_paths),
+                         ("record_root", [] if record_root is None else [record_root])):
+        if isinstance(paths, list):
+            for item in paths:
+                if not valid_posix_path(item):
+                    errors.append(f"{label} requires literal absolute POSIX paths excluding '/', dot segments and wildcards")
+    if isinstance(allowed_domains, list) and (not allowed_domains or not all(valid_domain(d) for d in allowed_domains)):
+        errors.append("allowed_domains must contain exact hostnames, not URLs, wildcards or empty values")
+    if valid_posix_path(root):
+        if isinstance(allowed_tooling_paths, list):
+            for tooling in allowed_tooling_paths:
+                if valid_posix_path(tooling) and paths_overlap(tooling, posixpath.dirname(root)) and not is_within(root, tooling):
+                    errors.append("allowed_tooling_paths must not expose the matter registry, siblings or ancestors")
+        if valid_posix_path(record_root) and not is_within(root, record_root):
+            errors.append("record_root outside the selected matter is unsupported; use null or a path inside the matter")
+
     return errors
 
 
@@ -315,33 +331,6 @@ def generate_sandbox_policy(definition: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
-    """Write JSON with LF newlines via temp file + os.replace (write-or-nothing)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path: str | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            mode="w",
-            encoding="utf-8",
-            newline="\n",
-            dir=str(path.parent),
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            delete=False,
-        ) as tmp:
-            json.dump(payload, tmp, indent=2, ensure_ascii=False)
-            tmp.write("\n")
-            tmp_path = tmp.name
-        os.replace(tmp_path, path)
-        tmp_path = None
-    finally:
-        if tmp_path is not None:
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Generate a per-matter Claude sandbox policy fragment",
@@ -379,11 +368,14 @@ On validation failure the script writes nothing and exits non-zero.
 
     args = parser.parse_args()
     output_path = Path(args.output)
+    if output_path.resolve() == Path(args.matter_definition).resolve():
+        print("ERROR: output must not overwrite the matter definition", file=sys.stderr)
+        return 1
 
     try:
         with open(args.matter_definition, "r", encoding="utf-8") as f:
             definition = json.load(f)
-    except json.JSONDecodeError as e:
+    except (json.JSONDecodeError, UnicodeError) as e:
         print(f"ERROR: Invalid JSON in matter definition: {e}", file=sys.stderr)
         return 1
     except OSError as e:
@@ -407,6 +399,14 @@ On validation failure the script writes nothing and exits non-zero.
                     errors.append(alias_error)
 
         other_roots = [r.strip() for r in args.other_roots.split(";") if r.strip()]
+        for other in other_roots:
+            if not valid_posix_path(other):
+                errors.append("other-roots requires literal absolute POSIX paths excluding root")
+        tooling_paths = definition.get("allowed_tooling_paths", [])
+        if isinstance(tooling_paths, list):
+            for tooling in tooling_paths:
+                if valid_posix_path(tooling) and any(valid_posix_path(other) and paths_overlap(tooling, other) for other in other_roots):
+                    errors.append("allowed_tooling_paths exposes another configured matter")
         if other_roots:
             overlap_error = check_overlapping_roots(root, other_roots)
             if overlap_error:

@@ -34,7 +34,7 @@ function check(label, got, want) {
 
 function run(args, input) {
   const cmd = [GENERATOR, ...args];
-  const r = spawnSync('python3', cmd, {
+  const r = spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), cmd, {
     input: input !== undefined ? input : undefined,
     encoding: 'utf8',
     cwd: TMP,
@@ -167,5 +167,38 @@ check('overlap error mentions identical', r.stderr.includes('identical'), true);
 r = run(['--matter-definition', path.join(TMP, 'nonexistent.json'), '--output', path.join(TMP, 'out7.json')]);
 check('missing file exits non-zero', r.code !== 0, true);
 
+const validMatter = {
+  matter_id: 'synthetic-1', name: 'Synthetic', root: '/srv/matters/Smith', aliases: [],
+  allowed_tooling_paths: ['/usr/bin'], allowed_domains: ['api.anthropic.com'], record_root: null,
+};
+for (const [label, change] of [
+  ['root dot alias', { root: '/srv/..' }],
+  ['root slash alias', { root: '/./' }],
+  ['wildcard root', { root: '/srv/matters/*' }],
+  ['control path', { root: '/srv/matters/Smith\n' }],
+  ['backslash path', { root: '/srv/matters\\Smith' }],
+  ['global tooling access', { allowed_tooling_paths: ['/'] }],
+  ['ancestor tooling access', { allowed_tooling_paths: ['/srv'] }],
+  ['sibling tooling access', { allowed_tooling_paths: ['/srv/matters/Jones'] }],
+  ['wildcard egress', { allowed_domains: ['*'] }],
+  ['URL egress', { allowed_domains: ['https://api.anthropic.com'] }],
+  ['empty egress', { allowed_domains: [] }],
+  ['unimplemented central archive', { record_root: '/srv/archive' }],
+]) {
+  writeMatter({ ...validMatter, ...change });
+  const before = fs.readFileSync(OUTPUT, 'utf8');
+  const result = run(['--matter-definition', MATTER_DEF, '--output', OUTPUT]);
+  check(`${label} refused`, result.code, 1);
+  check(`${label} preserves previous policy`, fs.readFileSync(OUTPUT, 'utf8') === before, true);
+  check(`${label} reports actionable error`, result.stderr.startsWith('ERROR:'), true);
+}
+writeMatter(validMatter);
+const sameInput = fs.readFileSync(MATTER_DEF, 'utf8');
+check('output cannot overwrite matter definition', run(['--matter-definition', MATTER_DEF, '--output', MATTER_DEF]).code, 1);
+check('matter definition preserved', fs.readFileSync(MATTER_DEF, 'utf8') === sameInput, true);
+check('invalid other-root refused', run(['--matter-definition', MATTER_DEF, '--output', OUTPUT, '--other-roots', 'relative']).code, 1);
+const temporaryFiles = fs.readdirSync(TMP).filter(name => name.endsWith('.tmp'));
+check('no partial temporary policy files remain', temporaryFiles.length, 0);
+fs.rmSync(TMP, { recursive: true, force: true });
 console.log(`\npassed=${pass} failed=${fail}`);
 process.exit(fail ? 1 : 0);
