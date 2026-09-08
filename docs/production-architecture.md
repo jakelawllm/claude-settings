@@ -41,7 +41,7 @@ Auth is supplied by Claude Code and the deploying organisation, not repository c
 | macOS with Claude sandbox alone | Hook tests supported | Open question; not certified |
 | Native Windows | Hook tests and static tooling supported | Unsupported; production preflight refuses |
 
-No platform is certified by repository tests. The operational register has no completed host evidence. Sandbox enabled without per-matter policy is insufficient. The checked-in template intentionally lacks that policy and uses warn/fail-open observation defaults.
+No platform is certified by repository tests. The exact tested Linux installation has [delegated synthetic-scope host acceptance](policy-decisions/internal-mvp-owner-acceptance.md); the production operational register remains unresolved. Sandbox enabled without per-matter policy is insufficient. The checked-in template intentionally lacks that policy and uses warn/fail-open observation defaults.
 
 ## External launcher contract
 

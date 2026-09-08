@@ -2,7 +2,7 @@
 
 A beta reference configuration for Claude Code used by trusted internal users in an Australian legal practice. It combines managed settings, a session-to-matter hook, a conduct skill and policy templates.
 
-**Internal-MVP scope:** synthetic matters and controlled evaluation. The repository provides local tooling; it does not provide an installed, accepted confidential-matter environment. Read the [current assessment](docs/INTERNAL_MVP_READINESS_REPORT.md) and [remaining issues](docs/INTERNAL_MVP_REMAINING_ISSUES.md) before a test run.
+**Internal-MVP scope: READY for the prepared synthetic test.** The [delegated owner acceptance](docs/policy-decisions/internal-mvp-owner-acceptance.md) completes the operational decisions for the exact tested Linux installation. Use its signed adapter through the [operator runbook](docs/synthetic-container-checks.md); no further owner sign-off is needed for invented-data evaluation. The repository provides local tooling, not an accepted confidential-matter environment. Read the [current assessment](docs/INTERNAL_MVP_READINESS_REPORT.md) and [remaining issues](docs/INTERNAL_MVP_REMAINING_ISSUES.md) before widening scope.
 
 This has not had independent security or legal certification and is not a production compliance package. Practitioner decisions remain necessary.
 

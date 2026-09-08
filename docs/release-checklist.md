@@ -312,3 +312,9 @@ This checklist was inherited from main at e25608d975ef58d31bd4ff7984eabb0622046b
 Run python scripts/verify.py for the complete offline suite, including new converter/E2E-oracle tests, syntax, schema, parity, clause, link, scanner and bundle checks. Live harness success proves hook integration, not installed managed policy or OS isolation. The evidence registers still require real deployment observations. The optional OAuth workflow is disabled until explicitly enabled and its overdue rotation is resolved.
 
 The manifest JSON example above is descriptive, not a published schema endpoint. The generator validates all hash fields, dates, tree state, declared range and explicitly supplied tested client version; use --claude-code-version with the actual tested version for both generation and verification.
+
+## 2026-09-08 current delegated internal-MVP decision
+
+The owner subsequently authorised Codex to complete the owner decisions using its judgment. The [current acceptance](policy-decisions/internal-mvp-owner-acceptance.md) completes all 12 operational dispositions for the exact synthetic target: ten observed engineering gates adopted, supervised synthetic records accepted, and independent certification waived for this test. This is a new scoped decision based on explicit delegation; the August history is not rewritten or treated as a personal re-review.
+
+The prepared synthetic journey is READY and requires no further owner-completion fields. Existing production/tag checkboxes above remain production requirements; confidential supplier/legal/records/key-custody facts are not supplied by this internal-test decision. Runtime controls, required tests, production preflight, merge and tag gates are unchanged.

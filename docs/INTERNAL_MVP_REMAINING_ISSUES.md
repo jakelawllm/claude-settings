@@ -2,25 +2,27 @@
 
 ## Readiness decision
 
-**Status:** NOT READY
+**Status:** READY — synthetic internal MVP only
 
-**Assessed commit:** `a6e28e079a0b`
+**Assessed commit:** `0b46e79` (verified baseline; this acceptance update changes documentation only)
 
 **Assessment date:** 2026-09-08
 
-The authenticated command and interactive synthetic workflows pass, including actual `/status` and normal exit after a signed restart. Confidential-matter use remains blocked by the two adoption requirements below. Executed evidence covers actual installed controls, sandbox and sibling isolation, restricted egress, signed launch, SessionEnd filing and encrypted independent-machine restore in the [assessment](INTERNAL_MVP_READINESS_REPORT.md) and [operator runbook](synthetic-container-checks.md). Technical repairs formerly listed as MVP-01 are recorded there rather than retained as unfinished work. Responsible-owner approvals are not inferred from engineering results. The protected `OWNER-REVIEW.md` maps all 12 operational rows to existing observations and the exact decisions still needed.
+The [delegated owner acceptance](policy-decisions/internal-mvp-owner-acceptance.md) completes all 12 operational decisions for the exact tested synthetic installation. Command and interactive workflows, signed restart, installed controls, isolation, filing and encrypted recovery have passed. No unresolved P0 or P1 remains within that approved scope. Confidential/client material is outside it: MVP-02 and MVP-03 below remain mandatory before that expansion. Existing historical NOT READY decisions are superseded for the synthetic scope, not retroactively changed into production approval.
 
 ## Internal-MVP blockers requiring human or external action
 
 | ID | Severity | Issue | Evidence | Why ChatGPT could not complete it | Exact action required | Suggested owner | Verification method |
 |---|---|---|---|---|---|---|---|
-| MVP-02 | P1 for confidential use | Actual supplier, legal, data-flow and deployment adoption approvals are absent | [Supplier](supplier-evidence-register.md), [legal](legal-source-register.md) and [operational](operational-evidence-register.md) registers retain unresolved owner/date/reference fields. Real production preflight exits 1 with 73 governance errors. The tested signing key is an engineering trust anchor; telemetry was disabled for synthetic tests. | Actual account contracts, applicable jurisdictions, approved deployment authority and principal decisions were not supplied. Test results establish observations, not those external facts. | Record the intended account/tier/region and controlled contract/retention sources; complete supplier and legal owner/checked/next-review fields and dated clause 8.8 approval. Adopt the tested host/version/key or supply an approved replacement and rerun its affected acceptance checks. Review the existing technical evidence and enter accountable operational references. Approve telemetry-disabled operation and its metadata gap, or configure the actual collector and observe its content exclusion/access/retention before adoption. | Responsible principal / AI officer / privacy and deployment owners | Run `python scripts/preflight-validate.py --mode production --evidence-root <completed-controlled-evidence-root> <installed-managed-settings.json>` on the accepted Linux target. Require exit 0 and retain approvals and evidence references outside this public repository. Do not replace real registers with test fixtures. |
-| MVP-03 | P1 for confidential use | Records storage, retention/hold, recovery-key custody and filing-gap accountability are not adopted | [Records requirements](records-schema.md); actual managed SessionEnd archive and seven-check encrypted restore passed. Only ciphertext travelled to the separate Windows machine; its key stayed on the source host. No off-host key escrow or owner-approved retention/hold/process evidence exists. | Engineering cannot select the practice's retention obligations, name an accountable records operator or declare a storage/key custodian approved. A restore with the original key available does not establish recovery after losing that host/key. | Approve the actual encrypted storage and supervised records process, or an explicit manual equivalent for the limited test. Assign a records operator, retention/hold and filing-gap response. Place recovery key material with an approved independent custodian, then restore a synthetic backup without access to the original host/key and compare its source hash; preserve existing originals. Record the controlled result and acceptance in the operational register. | Records owner / deployment operator / key custodian | The independent-custody restore matches source; wrong/unauthorised access is denied; the owner accepts storage, access/logging, retention/hold, deletion and gap handling. Existing SessionEnd and seven-check restore evidence need not be repeated unchanged merely to add an owner name. |
+
+None for the approved synthetic scope. Start through the signed adapter in the [operator runbook](synthetic-container-checks.md); no further owner sign-off or login is required.
 
 ## Non-blocking work recommended before wider production use
 
 | ID | Priority | Issue | Reason deferred | Recommended next action |
 |---|---|---|---|---|
+| MVP-02 | P1 if confidential use is introduced | Actual supplier/legal/data-flow and production deployment adoption are incomplete | The supplier/legal/production operational registers retain unverified fields; last real preflight refused 73 governance errors. Synthetic owner acceptance supplies no account contract or legal opinion. | Before client data, record actual account/tier/region, controlled terms and retention sources, current jurisdiction-specific legal approval and dated clause 8.8 decision; adopt production deployment/key and telemetry choices. Complete the controlled registers and run `python scripts/preflight-validate.py --mode production --evidence-root <completed-controlled-evidence-root> <installed-managed-settings.json>` on accepted Linux; require exit 0. Owners: responsible principal and privacy/deployment owners. |
+| MVP-03 | P1 if confidential use is introduced | Client records obligations and independent recovery-key custody remain unestablished | Seven actual encrypted restore checks passed, but the original key stayed on the source host. The accepted manual process covers invented test data only. | Records/legal owners must adopt storage, access logging, retention/hold/deletion and gap response; place recovery material with an approved independent custodian. Restore a synthetic backup without original host/key, compare source hash and verify unauthorised access refusal, then record the controlled acceptance. Preserve originals. |
 | W-01 | P2 | Optional Claude automation's recorded OAuth rotation is overdue | Workflow 322652643 is verified disabled_manually and unnecessary for internal tests; the [historical decision](policy-decisions/oauth-token-management.md) records the expired date. | Keep it disabled. If enabling, have its account owner rotate the secret, record current dates/ownership and approved disposition, run `gh workflow enable 322652643 --repo jakelawllm/claude-settings`, set `ENABLE_CLAUDE_WORKFLOW=true`, then verify one trusted and one denied untrusted invocation. |
 | W-02 | P3 | Live model sampling and payload coverage are bounded | Adversarial regressions cover identified defects; instructions cannot guarantee model behaviour. No dedicated fuzz/coverage programme is claimed. | Add a versioned synthetic corpus for new tool payloads and conduct prompts; record actual model/client and expected outcomes before expanding usage. |
 | W-03 | P3 | Broader records wording remains an owner decision | Supplementary review proposed extending clause 17.1 to all client advice; current legal wording is deliberate and the skill already requests broader records. | Principal decides whether to amend clause 17.1. If approved, edit authoritative DOCX, regenerate Markdown, update conduct anchors and run `python scripts/verify.py`. |
@@ -28,22 +30,22 @@ The authenticated command and interactive synthetic workflows pass, including ac
 
 ## Required manual test checklist
 
-- [ ] Before confidential use, adopt the actual supplier/legal/data-flow and tested deployment evidence, including the signing authority and telemetry decision; complete accountable register references and run the real production preflight above.
-- [ ] Before confidential use, accept actual records storage, retention/hold and gap handling; perform a synthetic restore using independently held recovery material without the original host/key.
+No manual acceptance check is outstanding for the approved synthetic scope. For each future session, follow the [accepted filing procedure](policy-decisions/internal-mvp-owner-acceptance.md): verify the expected private JSONL after exit and stop the next test if filing is missing or malformed. This is an operating duty, not another approval gate.
+
+Before widening to confidential use, execute the concrete MVP-02 production preflight and MVP-03 independent-custody restore listed above.
 
 ## External requirements
 
-- Actual selected-account contracts and responsible principal/legal/privacy/deployment decisions, supplied as controlled references rather than credentials or confidential documents in Git.
-- Approved records storage/process, accountable operator and independent recovery-key custody.
+None is outstanding to start the prepared synthetic test. Continue using existing authorised SSH/authentication and the signed adapter. No new credentials, host work, collector, records service or confidential data is required.
 
-No further login, host-administration access, launcher implementation or confidential data is required to start the prepared synthetic internal test. Both command and interactive entry have been observed successfully; use the signed adapter in the operator runbook. No multi-region infrastructure, public onboarding, SOC 2 programme or enterprise-scale redesign is required. Optional GitHub Claude automation credentials are unnecessary for this test.
+Confidential-use expansion requires actual selected-account contract/legal references and an approved records process with independent recovery-key custody, as specified in MVP-02/03. Optional GitHub automation credentials are unnecessary for the approved test.
 
 ## Known limitations accepted for the internal MVP
 
 - Use invented matters in the tested environment until confidential-use approvals are complete. Technical results are bounded to the exact host/image/client and test trust anchor; they are not independent legal or security certification.
 - The hook evaluates shell access by cwd and does not isolate a malicious trusted host operator. The tested OS/container boundary keeps sibling matters unmounted; start a fresh session when changing matter.
-- Archives are convenience JSONL copies, and the current recovery key remains on the source host. Preserve source transcripts until verified filing; do not treat the demonstrated encrypted round trip as recovery after host/key loss.
+- Archives are convenience JSONL copies; the owner adopts supervised filing and preservation during evaluation. The key remains on the source host, and host/key-loss risk is accepted only for invented test data. No client retention policy or independent key recovery is claimed.
 - The client reports a Linux sandbox glob-rule warning. Read-deny globs expand existing paths and do not dynamically cover matching files created within the same Bash command; retain all deny rules and keep secrets out of the selected synthetic matter. Outside-matter isolation is separately tested.
-- Telemetry is disabled for synthetic sessions. The resulting metadata gap must be adopted or a real collector separately observed before confidential use.
+- Telemetry-disabled operation and its metadata gap are accepted for this synthetic test. A production decision or an observed real collector remains required before confidential use.
 - Policy templates need practice-specific adoption; the separate barristers protocol is not wired into the compliance skill. Apply its separately reviewed procedure when relevant.
 - Practitioners must verify model output and citations. The repository supplies controls and tests, not a guarantee of legal accuracy.

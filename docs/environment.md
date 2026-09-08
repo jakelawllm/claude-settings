@@ -33,7 +33,7 @@ Bind these paths within the selected container's mounts. Do not share state with
 
 CLAUDE_CODE_ENABLE_TELEMETRY=1 selects telemetry. OTEL_METRICS_EXPORTER=otlp and OTEL_LOGS_EXPORTER=otlp select signals, OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf sets transport, and OTEL_EXPORTER_OTLP_ENDPOINT supplies the base URL. Signal paths are derived by the exporter: do not use /v1/traces as the generic endpoint.
 
-OTEL_LOG_USER_PROMPTS, OTEL_LOG_ASSISTANT_RESPONSES, OTEL_LOG_TOOL_DETAILS, OTEL_LOG_TOOL_CONTENT and OTEL_LOG_RAW_API_BODIES are explicitly 0. Leaving them unset allows an inherited value to collect content. --disable-telemetry disables export explicitly; this needs a recorded alternative to metadata collection for client use.
+OTEL_LOG_USER_PROMPTS, OTEL_LOG_ASSISTANT_RESPONSES, OTEL_LOG_TOOL_DETAILS, OTEL_LOG_TOOL_CONTENT and OTEL_LOG_RAW_API_BODIES are explicitly 0. Leaving them unset allows an inherited value to collect content. --disable-telemetry disables export explicitly. The [delegated synthetic acceptance](policy-decisions/internal-mvp-owner-acceptance.md) adopts that setting and the manual test-record process; client use still needs its own recorded metadata decision.
 
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC, DISABLE_FEEDBACK_COMMAND and CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY are 1 in the managed template. settings.json additionally disables telemetry/error reporting for personal convenience. These are client controls, not supplier contract or retention guarantees.
 

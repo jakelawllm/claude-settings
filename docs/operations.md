@@ -1,6 +1,6 @@
 # Internal test operations
 
-Use synthetic material until the remaining deployment requirements are complete. The offline tools create no server, database, migrations or durable records service.
+The prepared synthetic installation is [accepted under owner delegation](policy-decisions/internal-mvp-owner-acceptance.md). Start through the [signed operator adapter](synthetic-container-checks.md); no further adoption fields block this scope. Use invented material only, and perform the accepted per-session filing/hash check before the next test. The offline tools create no server, database, migrations or durable records service.
 
 ## Prepare and verify
 

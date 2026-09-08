@@ -44,3 +44,5 @@ The two policy DOCX files are authoritative; their Markdown counterparts are gen
 Update README, architecture, operations, environment reference and readiness reports with affected behavior. Keep dated historical decisions intact and add a dated superseding note. Do not describe an unobserved platform/version as certified. No independent security or legal certification has been supplied.
 
 The files research.md, policy-review*.md and the original readiness/planning reports are gitignored local review records. If absent, say so; do not claim their findings were reconciled.
+
+The [2026-09-08 delegated acceptance](docs/policy-decisions/internal-mvp-owner-acceptance.md) completes owner decisions for the prepared synthetic installation. Do not ask to renew those same decisions for unchanged invented-data tests. It does not complete the separate production registers or authorise client data, a changed runtime/key, a default-branch merge or a release tag. Preserve that scope and its actual evidence when updating readiness.
