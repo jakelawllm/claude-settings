@@ -28,7 +28,7 @@ The manifest records the supplied actual client version, version range and artif
 
 1. **OS/container isolation:** primary filesystem/network boundary for interpreters. Only selected matter and approved tooling may be visible. Protect the managed bundle and its parent directories against replacement by the runtime UID; a read-only mount and nonroot process must be verified at the target.
 2. **Managed settings and hook:** client controls and accidental cross-matter defense. PreToolUse has wildcard matcher; unknown tools default-deny. Bash is checked by cwd, not command parsing. LSP uses its filePath.
-3. **Compliance skill:** model instructions for output and practitioner records. Static tests check its text; they do not establish behavioral or legal compliance.
+3. **Compliance skill:** model instructions for output and practitioner records. The external installer copies repository source `skills/ai-policy-compliance/SKILL.md` to `<managed-policy directory>/.claude/skills/ai-policy-compliance/SKILL.md`. Static tests check its text; installed-source discovery and invocation require a real client session, and neither establishes general behavioral or legal compliance.
 
 Auth is supplied by Claude Code and the deploying organisation, not repository code. forceLoginOrgUUID is a placeholder until rendering; the example UUID is not authentication. Local hook state has filesystem permissions, not tenant accounts or a database. OS/account separation must protect it from other users.
 

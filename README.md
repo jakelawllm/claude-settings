@@ -107,7 +107,7 @@ macOS policy tooling: /Library/Application Support/ClaudeCode/managed-settings.j
 Windows policy tooling: C:\Program Files\ClaudeCode\managed-settings.json
 ```
 
-The hook and skills directories sit beside settings. The literal hook command must match its installed path; the renderer defaults to Linux. Installing the template verbatim is not a deployment.
+Install the hook under `hooks/` and the compliance skill under `.claude/skills/ai-policy-compliance/` inside the managed-policy directory. On Linux the skill path is `/etc/claude-code/.claude/skills/ai-policy-compliance/SKILL.md`; the repository source remains `skills/ai-policy-compliance/SKILL.md`. The literal hook command must match its installed path; the renderer defaults to Linux. Installing the template verbatim is not a deployment.
 
 The declared range is 2.1.251 to 2.1.300. The minimum avoids a telemetry destination-override problem fixed in 2.1.251; the maximum is a policy cap, not evidence all versions passed. Record the actual client during acceptance and recheck upgrades. See [Claude monitoring documentation](https://code.claude.com/docs/en/monitoring-usage).
 

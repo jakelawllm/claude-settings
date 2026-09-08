@@ -40,11 +40,11 @@ Generation requires a clean tree. --allow-dirty is for development evidence only
 
 The deploying operator supplies the Linux/WSL2 container/launcher described in [architecture](production-architecture.md). This repository does not install it. Mount only the selected synthetic matter and required tooling; keep credentials, sibling matters and host control sockets unavailable.
 
-Install the rendered settings, hook and skill in the managed-policy directory, verify the manifest, then run claude doctor and inspect /status in a new Claude session. Confirm the intended organisation and policy sources. If the hook cannot launch or the sandbox is unavailable, stop testing; do not remove protection to continue.
+Install the rendered settings and `hooks/matter-guard.js` in the managed-policy directory, and copy the repository compliance skill to `.claude/skills/ai-policy-compliance/SKILL.md` within that directory (`/etc/claude-code/.claude/skills/ai-policy-compliance/SKILL.md` on Linux). Verify the manifest, then run claude doctor and inspect /status in a new Claude session. Confirm the intended organisation and policy sources. If the hook cannot launch or the sandbox is unavailable, stop testing; do not remove protection to continue.
 
 Start Claude in the selected matter directory. Ask for a summary of a synthetic text file, attempt a sibling-matter Read and search, and confirm denials. End the session with /exit. Confirm its JSONL archive exists and can be read by the authorised operator. A fresh Claude session is required to change matter; restarting a hook process preserves the old session binding.
 
-Run the live harness separately using the command in README. Its temporary settings test hook integration and do not replace managed host acceptance.
+Run the live harness separately using the command in README. Its temporary settings test hook integration and do not replace managed host acceptance. Confirm the installed compliance skill appears in `/skills` and invoke it through the actual Skill tool without `--plugin-dir`; the separate conduct harness side-loads a plugin and cannot establish managed-skill discovery.
 
 See [synthetic container checks](synthetic-container-checks.md) for mount syntax, effective parent-directory permissions, separate authentication and offline boundaries, and the observed nested-sandbox startup failure.
 

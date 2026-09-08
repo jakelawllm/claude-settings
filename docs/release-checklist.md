@@ -20,7 +20,7 @@ A release candidate should have these artefacts:
 - the tracked source tree at the release tag;
 - a rendered managed settings file for the deploying practice, usually `dist/managed-settings.production.json`;
 - the managed hook at the platform path referenced by that rendered file;
-- the `skills/ai-policy-compliance/` directory installed beside the managed settings file;
+- repository source `skills/ai-policy-compliance/` installed under `.claude/skills/ai-policy-compliance/` inside the managed-policy directory;
 - recorded output from the validation commands below;
 - a rollback copy of the previous known-good managed-policy bundle;
 - a release manifest (`dist/release-manifest.json`) containing hashes of all critical artefacts, signed by the deployment process outside this repository.
@@ -263,12 +263,14 @@ macOS         /Library/Application Support/ClaudeCode/managed-settings.json
 Linux, WSL    /etc/claude-code/managed-settings.json
 ```
 
-Install the hook and skill beside it:
+Install the hook and skill at these paths relative to the managed-policy directory:
 
 ```text
 <system directory>/hooks/matter-guard.js
-<system directory>/skills/ai-policy-compliance/SKILL.md
+<system directory>/.claude/skills/ai-policy-compliance/SKILL.md
 ```
+
+On Linux, the managed skill must be `/etc/claude-code/.claude/skills/ai-policy-compliance/SKILL.md`. Confirm it appears in `/skills` and observe an actual Skill invocation from that installed source; a plugin loaded with `--plugin-dir` does not verify this installation. See [Claude managed skill locations](https://code.claude.com/docs/en/skills#remove-a-skill).
 
 The hook command in the rendered settings file is literal JSON. It must match the installed path for the platform. A Linux path in a macOS deployment is a broken guard, not a portability feature.
 
@@ -281,7 +283,7 @@ Before rollout, keep a copy of the previous known-good managed-policy bundle:
 ```text
 managed-settings.json
 hooks/matter-guard.js
-skills/ai-policy-compliance/SKILL.md
+.claude/skills/ai-policy-compliance/SKILL.md
 sandbox-policy.json
 release-manifest.json
 ```

@@ -48,7 +48,7 @@ python3 scripts/generate-release-manifest.py --claude-code-version "<actual test
   --sandbox-policy dist/sandbox-policy.json
 ```
 
-The manifest records hashes of the hook, settings template, rendered production settings, compliance skill and dependency lock file. Signature of the manifest is a deployment responsibility outside this repository.
+The manifest records hashes of the hook, settings template, rendered production settings, compliance skill and dependency lock file. Signature of the manifest is a deployment responsibility outside this repository. Install the source compliance skill at `<managed-policy directory>/.claude/skills/ai-policy-compliance/SKILL.md`; on Linux this is `/etc/claude-code/.claude/skills/ai-policy-compliance/SKILL.md`.
 
 ## 4. Run manual release gates
 
@@ -56,8 +56,8 @@ Run these on the target container platform path after host acceptance for the re
 
 1. `claude doctor`, confirming managed settings are loaded.
 2. `/status` in a real session, confirming managed settings and hooks are in force.
-3. `CLAUDE_E2E=1 node tests/e2e.test.js` on a signed-in Claude Code installation.
-4. A real cross-matter refusal smoke test with the rendered settings.
+3. `CLAUDE_E2E=1 node tests/e2e.test.js` on a separate signed-in synthetic harness installation; its temporary hooks/settings do not validate installed managed controls.
+4. A real cross-matter refusal smoke test with the rendered settings, plus discovery and actual Skill invocation of the installed compliance skill without `--plugin-dir`.
 5. A sandbox availability check proving `sandbox.failIfUnavailable` refuses unprotected use.
 6. A `SessionEnd` transcript filing check, including one failure path observed by the external records service.
 7. Data-flow observation and owner sign-off under `docs/data-flow-model.md`.
@@ -83,7 +83,7 @@ The release owner records approval only after every automated gate, manual gate 
 ```text
 managed-settings.json
 hooks/matter-guard.js
-skills/ai-policy-compliance/SKILL.md
+.claude/skills/ai-policy-compliance/SKILL.md
 sandbox-policy.json
 release-manifest.json
 ```
