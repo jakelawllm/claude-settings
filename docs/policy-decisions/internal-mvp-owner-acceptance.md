@@ -71,3 +71,7 @@ The actual observed SessionEnd and seven-check restore results satisfy the accep
 **Confidential-use approval:** NOT GRANTED. Actual account/contracts, jurisdiction-specific legal adoption, retention/hold requirements and independent key custody remain prerequisites listed in [remaining issues](../INTERNAL_MVP_REMAINING_ISSUES.md).
 
 The [production operational register](../operational-evidence-register.md) remains a separate production record. Its unresolved fields and production preflight refusal are retained deliberately; they do not create another owner gate for this approved synthetic test. This decision does not satisfy or bypass production preflight. The current [readiness assessment](../INTERNAL_MVP_READINESS_REPORT.md) records READY only within this explicit internal scope.
+
+## Subsequent supervised run
+
+The post-adoption run documented in the [runbook](../synthetic-container-checks.md) executed the filing/hash procedure for three actual sessions, all matching their exact source transcripts. It exposed a result-checker false negative for a valid guard denial. The bounded external checker correction passed 50 regressions, a fresh actual refusal and final signed-runtime verification. The original scripts and failed observation are retained; signed runtime policy, image, prompts and key are unchanged. This correction is accepted within the existing delegated synthetic scope, without renewing or widening confidential-use approval.
