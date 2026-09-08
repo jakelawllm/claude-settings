@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Scan Office XML payloads for credentials and identifying detail.
 
-    python3 scripts/scan-docx-xml.py [path ...]
+    python3 scripts/scan-docx-xml.py [--worktree] [--history] [path ...]
 
 Git history scanning does not see text stored inside .docx zip members, and a
 practice identifier committed once into document metadata remains in history.
@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import argparse
 import io
+import os
+import stat
 import re
 import subprocess
 import sys
@@ -58,20 +60,161 @@ def safe_location(value: str) -> str:
     return re.sub(r"[\x00-\x1f\x7f]", "?", value)
 
 
-def iter_office_files(paths: list[Path]) -> list[Path]:
-    if paths:
-        for p in paths:
-            if not p.is_file() or p.suffix.lower() not in OFFICE_SUFFIXES:
-                raise ValueError("each explicit input must be an existing Office file")
-        return paths
-    ignored_parts = {".git", ".venv", "node_modules", "dist", "__pycache__"}
-    found = []
-    for p in Path(".").rglob("*"):
-        if any(part in ignored_parts for part in p.parts):
+def git_output(args: list[str], root: Path | None = None) -> bytes:
+    """Never expose Git stderr: errors and filenames can themselves contain secrets."""
+    return subprocess.run(["git", *args], cwd=root, capture_output=True,
+                          check=True, timeout=30).stdout
+
+
+def repository_files() -> tuple[Path, list[str], list[tuple[str, str, str]]]:
+    """Git prunes ignored runtime trees before enumeration, including new files.
+
+    Tracked files remain eligible even when an ignore rule also matches them.
+    NUL delimiters preserve hostile filenames without treating them as options.
+    """
+    root = Path(os.fsdecode(git_output(["rev-parse", "--show-toplevel"]).removesuffix(b"\n").removesuffix(b"\r")))
+    names: set[str] = set()
+    staged = []
+    for row in git_output(["ls-files", "--stage", "-z"], root).split(b"\0"):
+        if not row:
             continue
-        if p.suffix.lower() in OFFICE_SUFFIXES:
-            found.append(p)
-    return found
+        header, sep, raw_name = row.partition(b"\t")
+        fields = header.split()
+        if not sep or len(fields) != 3:
+            raise ValueError("invalid Office index listing")
+        mode, oid, stage = (field.decode("ascii") for field in fields)
+        if stage != "0":
+            raise ValueError("unresolved index conflicts prevent complete Office scanning")
+        if not re.fullmatch(r"[0-9a-f]{40,64}", oid):
+            raise ValueError("invalid Office index object")
+        name = os.fsdecode(raw_name)
+        validate_repository_name(name)
+        if name.lower().endswith(OFFICE_SUFFIXES):
+            names.add(name)
+            staged.append((name, mode, oid))
+    for raw_name in git_output(["ls-files", "--others", "--exclude-standard", "-z"], root).split(b"\0"):
+        if raw_name:
+            name = os.fsdecode(raw_name)
+            validate_repository_name(name)
+            if name.lower().endswith(OFFICE_SUFFIXES):
+                names.add(name)
+    return root, sorted(names), staged
+
+
+def validate_repository_name(name: str) -> None:
+    if not name or Path(name).is_absolute() or Path(name).drive or ".." in Path(name).parts:
+        raise ValueError("invalid Office repository path")
+
+
+def unsafe_link(info: os.stat_result) -> bool:
+    # Windows junctions/reparse points must not become a route outside the checkout.
+    return stat.S_ISLNK(info.st_mode) or bool(
+        getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400)
+    )
+
+
+def read_office_payload(path: Path) -> bytes:
+    """Read a bounded regular file without following filesystem symlink targets."""
+    absolute = Path(os.path.abspath(path))
+    parts = absolute.parts
+    current = Path(parts[0])
+    parents = []
+    for part in parts[1:-1]:
+        current /= part
+        info = current.lstat()
+        if unsafe_link(info) or not stat.S_ISDIR(info.st_mode):
+            raise ValueError("unsafe Office path")
+        parents.append((current, info))
+    before = absolute.lstat()
+    if unsafe_link(before) or not stat.S_ISREG(before.st_mode):
+        raise ValueError("Office input must be a regular file without symlinks")
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0)
+    parent_fd = None
+    try:
+        if os.open in os.supports_dir_fd and hasattr(os, "O_DIRECTORY"):
+            parent_fd = os.open(parts[0], flags | os.O_DIRECTORY)
+            for part in parts[1:-1]:
+                next_fd = os.open(part, flags | os.O_DIRECTORY, dir_fd=parent_fd)
+                os.close(parent_fd)
+                parent_fd = next_fd
+            fd = os.open(parts[-1], flags, dir_fd=parent_fd)
+        else:
+            fd = os.open(absolute, flags)
+        with os.fdopen(fd, "rb") as source:
+            opened = os.fstat(source.fileno())
+            if not stat.S_ISREG(opened.st_mode) or (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+                raise ValueError("Office file changed before scanning")
+            # Verify parents before reading on platforms without openat/O_NOFOLLOW.
+            for parent, old in parents:
+                now = parent.lstat()
+                if unsafe_link(now) or (old.st_dev, old.st_ino) != (now.st_dev, now.st_ino):
+                    raise ValueError("Office parent changed before scanning")
+            if opened.st_size > MAX_DOCUMENT_BYTES:
+                raise ValueError("Office scan size limit exceeded")
+            payload = source.read(MAX_DOCUMENT_BYTES + 1)
+            after = os.fstat(source.fileno())
+            if len(payload) > MAX_DOCUMENT_BYTES:
+                raise ValueError("Office scan size limit exceeded")
+            if (opened.st_size, opened.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+                raise ValueError("Office file changed while scanning")
+            return payload
+    finally:
+        if parent_fd is not None:
+            os.close(parent_fd)
+
+
+def iter_office_files(paths: list[Path]) -> list[Path]:
+    # Explicit paths stay usable outside a Git checkout; unsafe targets fail closed.
+    for p in paths:
+        try:
+            info = p.lstat()
+        except OSError:
+            raise ValueError("each explicit input must be an existing Office file") from None
+        if unsafe_link(info) or not stat.S_ISREG(info.st_mode) or p.suffix.lower() not in OFFICE_SUFFIXES:
+            raise ValueError("each explicit input must be an existing regular Office file without symlinks")
+    return paths
+
+
+def scan_worktree(include_index: bool) -> tuple[list[tuple[str, str]], list[str], int, int]:
+    hits, errors, count, staged_count = [], [], 0, 0
+    try:
+        root, names, staged = repository_files()
+        tracked = {name for name, _, _ in staged}
+        for name in names:
+            path = root / name
+            try:
+                payload = read_office_payload(path)
+            except FileNotFoundError:
+                # A worktree deletion does not delete its independently scanned index blob.
+                if name not in tracked:
+                    errors.append(f"{safe_location(name)}: new Office file disappeared before scanning")
+                continue
+            except (OSError, ValueError):
+                errors.append(f"{safe_location(name)}: unreadable or unsafe Office file")
+                continue
+            count += 1
+            found, failures = scan_document(Path(name), payload)
+            hits.extend(found)
+            errors.extend(failures)
+        if include_index:
+            for name, mode, oid in staged:
+                if mode not in {"100644", "100755"}:
+                    errors.append(f"{safe_location(name)}: unsupported staged Office file mode")
+                    continue
+                staged_count += 1
+                size = int(git_output(["cat-file", "-s", oid], root))
+                if size < 0 or size > MAX_DOCUMENT_BYTES:
+                    errors.append(f"staged blob {oid[:12]}: Office scan size limit exceeded")
+                    continue
+                payload = git_output(["cat-file", "blob", oid], root)
+                if len(payload) != size:
+                    raise ValueError("incomplete Office index blob")
+                found, failures = scan_document(Path(f"staged-blob-{oid[:12]}"), payload)
+                hits.extend(found)
+                errors.extend(failures)
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError):
+        errors.append("could not completely enumerate or read Office worktree/index")
+    return hits, errors, count, staged_count
 
 
 def is_allowed_match(match_text: str) -> bool:
@@ -99,7 +242,7 @@ def scan_document(path: Path, payload: bytes | None = None) -> tuple[list[tuple[
     hits: list[tuple[str, str]] = []
     errors: list[str] = []
     try:
-        with zipfile.ZipFile(io.BytesIO(payload) if payload is not None else path) as zf:
+        with zipfile.ZipFile(io.BytesIO(payload if payload is not None else read_office_payload(path))) as zf:
             total = 0
             for info in zf.infolist():
                 member = info.filename
@@ -117,7 +260,7 @@ def scan_document(path: Path, payload: bytes | None = None) -> tuple[list[tuple[
                     if re.search(br"<!\s*(?:DOCTYPE|ENTITY)\b", data.replace(b"\0", b""), re.I):
                         raise ValueError("DTD/entity declarations are unsupported")
                     root = ET.fromstring(data)
-                except (KeyError, OSError, zipfile.BadZipFile, RuntimeError, ValueError, ET.ParseError):
+                except (LookupError, OSError, zipfile.BadZipFile, RuntimeError, ValueError, ET.ParseError):
                     errors.append(f"{location}: unreadable or unsupported XML member")
                     continue
                 # Word splits a single visible word between runs when formatting
@@ -126,7 +269,7 @@ def scan_document(path: Path, payload: bytes | None = None) -> tuple[list[tuple[
                 for element in root.iter():
                     for value in element.attrib.values():
                         hits.extend(scan_member(path, member, value))
-    except (zipfile.BadZipFile, OSError):
+    except (zipfile.BadZipFile, OSError, ValueError):
         errors.append(f"{safe_location(str(path))}: unreadable Office zip")
     return list(dict.fromkeys(hits)), errors
 
@@ -165,9 +308,12 @@ def scan_history() -> tuple[list[tuple[str, str]], list[str], int]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Scan Office XML for credentials and identifying detail.")
     parser.add_argument("paths", nargs="*", help="specific Office files to scan; defaults to repository scan")
+    parser.add_argument("--worktree", action="store_true", help="scan Git-listed working files and staged Office blobs independently")
     parser.add_argument("--history", action="store_true", help="also scan Office blobs reachable from all local Git refs")
     args = parser.parse_args(argv)
 
+    if args.worktree and args.paths:
+        parser.error("--worktree cannot be combined with explicit paths")
     try:
         documents = iter_office_files([Path(p) for p in args.paths])
     except ValueError as exc:
@@ -178,6 +324,11 @@ def main(argv: list[str] | None = None) -> int:
         hits, doc_errors = scan_document(document)
         all_hits.extend(hits)
         errors.extend(doc_errors)
+    working_count, staged_count = len(documents), 0
+    if not args.paths:
+        hits, failures, working_count, staged_count = scan_worktree(args.worktree)
+        all_hits.extend(hits)
+        errors.extend(failures)
     historical_count = 0
     if args.history:
         hits, failures, historical_count = scan_history()
@@ -195,7 +346,7 @@ def main(argv: list[str] | None = None) -> int:
     if errors:
         print(f"FAIL: {len(errors)} unreadable Office member(s)")
         return 1
-    print(f"No credential or identifying detail found in Office XML ({len(documents)} file(s), {historical_count} historical blob(s) scanned).")
+    print(f"No credential or identifying detail found in Office XML ({working_count} file(s), {staged_count} staged blob(s), {historical_count} historical blob(s) scanned).")
     return 0
 
 

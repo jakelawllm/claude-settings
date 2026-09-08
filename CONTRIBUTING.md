@@ -10,7 +10,7 @@ Read [AGENTS.md](AGENTS.md). Follow the virtual-environment setup in [README.md]
 python scripts/verify.py
 ```
 
-Use a dedicated branch, descriptive commits and a pull request. Required checks are matter-guard on Ubuntu, macOS and Windows, settings and policy, and secret scan. Control changes require code-owner review. Do not force-push or merge with failing checks.
+Use a dedicated branch, descriptive commits and a pull request. Required checks are matter-guard on Ubuntu, macOS and Windows, settings and policy, and secret scan. The hook-platform jobs also execute both scanner regression suites on each OS. Control changes require code-owner review. Do not force-push or merge with failing checks.
 
 ## Test selection
 
@@ -46,6 +46,6 @@ Dependencies are in requirements.txt and requirements-lock.txt. Retain the expli
 
 Preserve existing formatting, UTF-8 and generated LF line endings. There is no standalone formatter, linter or type checker; git diff --check, syntax, schema and behavioral tests are the quality gates.
 
-Only synthetic names, paths, account UUIDs and endpoints belong in fixtures. Never commit .env, production settings, credentials, transcripts or identifying evidence. Run history and Office XML scanners; logs must report safe labels/locations without matched content.
+Only synthetic names, paths, account UUIDs and endpoints belong in fixtures. Never commit .env, production settings, credentials, transcripts or identifying evidence. Run `python scripts/scan-history.py --worktree` before committing and `python scripts/scan-docx-xml.py --history --worktree` for Office changes; the full runner includes both. The worktree option checks staged and unstaged changes independently plus nonignored new files, while retaining full-history checks. Ignored runtime trees are excluded and symlink targets are not read. Logs must report safe labels/locations without matched content. If a public artifact digest triggers entropy detection, verify it against its source and add only that exact value with its reason to the existing allowlist; never exempt an entire file or arbitrary hashes.
 
 Local agent runtimes such as `.claude-orch/` contain credentials, session history and downloaded plugins; keep them ignored and never force-add them. The Markdown link check covers tracked files and new nonignored documents. It includes tracked `.claude/` documentation while Git prunes ignored local caches and worktrees.

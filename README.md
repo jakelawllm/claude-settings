@@ -81,7 +81,7 @@ For an installed internal session, confirm the intended account and effective se
 
 ## Checks and build
 
-`python scripts/verify.py` runs all offline suites, Node/Python syntax, dependency consistency, schema/hash checks, DOCX parity, clause references, local Markdown links, history/Office scanners, preflight and manifest verification. Live E2E is explicitly separate.
+`python scripts/verify.py` runs all offline suites, Node/Python syntax, dependency consistency, schema/hash checks, DOCX parity, clause references, local Markdown links, history/pending-change and Office scanners, preflight and manifest verification. Live E2E is explicitly separate.
 
 Focused tests use `node tests/<name>.test.js`. There is no standalone linter, formatter, type checker or compiled application. Bundle generation is the release build; git diff --check and syntax/schema checks are the static gates.
 

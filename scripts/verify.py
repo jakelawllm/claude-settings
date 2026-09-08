@@ -101,8 +101,8 @@ def main() -> int:
             if generated.read_text(encoding="utf-8") != (ROOT / (stem + ".md")).read_text(encoding="utf-8"):
                 raise RuntimeError(f"DOCX/Markdown drift: {stem}")
         run(PYTHON, "scripts/check-clause-refs.py")
-        run(PYTHON, "scripts/scan-history.py")
-        run(PYTHON, "scripts/scan-docx-xml.py", "--history")
+        run(PYTHON, "scripts/scan-history.py", "--worktree")
+        run(PYTHON, "scripts/scan-docx-xml.py", "--history", "--worktree")
         run(PYTHON, "scripts/preflight-validate.py", "--mode", "template", "managed-settings.json")
         evidence = temp / "synthetic-evidence"
         run("node", "tests/synthetic-evidence.js", str(evidence))

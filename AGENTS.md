@@ -34,6 +34,7 @@ Live `CLAUDE_E2E=1 node tests/e2e.test.js` is separate, uses synthetic data, req
 - Verify the actual managed Bash tool result, installed Skill invocation and SessionEnd archive. A zero client exit can contain a failed tool result; a standalone bubblewrap probe can pass while the client shell or dynamic loader is hidden.
 - Diagnostic argv/environment can contain ephemeral proxy credentials. Allowlist filesystem/namespace fields before printing or saving; never retain full execve arguments or authentication output.
 - Rendered settings, state, transcripts, real organisation identifiers and credentials must stay out of Git. Use only synthetic test data. Scanners must not print matched secrets, including secrets in filenames or exception text.
+- Run `python scripts/scan-history.py --worktree` before committing: it checks history, staged/unstaged changes and Git-listed nonignored new files. Do not use a history-only pass as proof that pending changes are scanned. Office changes are covered by `python scripts/scan-docx-xml.py --history --worktree`, also included in the full runner. Verified public digests need exact, reasoned exceptions; never exempt arbitrary hex strings or whole documentation paths.
 - Pin Actions by full SHA and Python dependencies with hashes; preserve Windows conditional dependencies when regenerating the lock.
 
 ## Documents

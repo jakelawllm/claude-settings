@@ -49,6 +49,12 @@ jobs:
       - name: Documentation control claims
         run: node tests/docs-control-claims.test.js
 
+      - name: Text scanner regressions
+        run: node tests/scan-history.test.js
+
+      - name: Office scanner regressions
+        run: node tests/scan-docx-xml.test.js
+
       # The end-to-end tier launches real Claude Code sessions and needs a
       # signed-in installation, so it cannot run here. It is checked for syntax
       # so a broken file is caught, and run by hand before a release.
@@ -90,14 +96,14 @@ jobs:
       # repositories, so it can never pass here. This is a dependency-free
       # scan of the same history; GitHub secret scanning and push protection
       # should be enabled as well before the repository is made public.
-      - name: Scan full history
-        run: python3 scripts/scan-history.py
+      - name: Scan history and pending changes
+        run: python3 scripts/scan-history.py --worktree
 
       - name: History scanner tests
         run: node tests/scan-history.test.js
 
       - name: Scan Office XML
-        run: python3 scripts/scan-docx-xml.py --history
+        run: python3 scripts/scan-docx-xml.py --history --worktree
 
       - name: Office XML scanner tests
         run: node tests/scan-docx-xml.test.js
