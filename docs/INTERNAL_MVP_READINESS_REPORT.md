@@ -234,3 +234,14 @@ The live synthetic authentication container is prepared with a private persisten
 The hardened offline candidate's nested sandbox is unavailable. Disposable no-data diagnostics with individual profile relaxations also failed; final candidates retain the default profiles and `failIfUnavailable` remains enforced. A supported scoped host configuration, authenticated installed-policy observation, real launcher/signature checks and approved-egress acceptance remain necessary. The outer Docker probes do not claim those passes.
 
 Records results are direct hook engineering tests, not a live client SessionEnd or approved records service. Supplier/legal/data-flow, retention/hold, actual storage and release-owner facts remain unresolved. No `OWNER-REQUIRED` evidence row was populated and no historical approval was fabricated.
+
+
+### 2026-09-08 clean-checkout delivery verification
+
+A new single-branch clone at `a55e88c` was transferred through Git's reachable-object protocol without local runtime files or credential configuration. Its canonical GitHub origin was restored and its working tree remained clean. The already fresh Python 3.12.3 hash-locked environment ran `python scripts/verify.py` from that clone: exit 0, 718 Node assertions plus 8 Python regressions, zero failures/skips, and 71 repository Markdown links resolved.
+
+The documented generator and renderer then produced a separate clean synthetic bundle. Manifest generation and `--verify`, using the actually installed Claude 2.1.263 and **without** `--allow-dirty`, both exited 0. This is an unsigned clean synthetic candidate; it does not supply release-owner approval or fix the target sandbox/authentication limits.
+
+Production preflight was executed in a disposable instance of the same image, with the real installed hook/settings paths and the clean checkout mounted read-only. It exited 1 with **73 unresolved governance errors**, all from the real registers. There were no missing installed-hook, Git-origin or expired-workflow-observation errors. An earlier source-only snapshot produced 75 errors, including two packaging/freshness errors; the complete clean checkout and freshly observed disabled-workflow record corrected those and the command was rerun. Synthetic fixture production preflight passed in the full runner, as expected; no real register was filled to achieve that pass.
+
+All five required checks passed for candidate `a55e88c`: [CI run 34172769618](https://github.com/jakelawllm/claude-settings/actions/runs/34172769618). The final documentation commit is subsequently checked through [PR 23 checks](https://github.com/jakelawllm/claude-settings/pull/23/checks). This historical candidate result does not claim a future commit's pass. Optional live container E2E/conduct and installed `/status` remain unexecuted because target authentication is incomplete; nested sandbox, launcher/signature and approved live-egress acceptance remain open.

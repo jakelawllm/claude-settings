@@ -44,7 +44,7 @@ The first script checks actual child-process file access with strace and a host 
 
 The records drill uses genuine nonroot hook subprocesses, failed permissions, an interrupted partial write, retry from preserved source, backup restore and cross-UID access denial. It provides engineering evidence only: no live client SessionEnd, supervised records service, independent backup destination, encryption, retention/hold policy or owner approval is inferred.
 
-Results must name failures and environmental limits. The development manifest uses `--allow-dirty` during generation and verification; that label must not be promoted to a clean signed release. Once the complete intended checkout is committed and clean, generate a new clean release candidate and verify it separately.
+Results must name failures and environmental limits. The development manifest uses `--allow-dirty` during generation and verification; that label must not be promoted to a clean signed release. Once the complete intended checkout is committed and clean, generate a new clean release candidate and verify it separately. This was subsequently executed from clean candidate `a55e88c`, without `--allow-dirty`; the unsigned synthetic manifest verified. It does not approve deployment or replace the remaining host/account checks.
 
 ## Authentication and live tests
 
