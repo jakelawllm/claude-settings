@@ -2,7 +2,7 @@
 
 **Assessment date:** 2026-09-08
 
-**Assessed code commit:** `8ec769a1e50f`
+**Assessed code commit:** `a4bb7adc85aa`
 
 **Baseline:** `e25608d975ef58d31bd4ff7984eabb0622046b22` on `main`
 
@@ -10,7 +10,7 @@
 
 ## Decision and scope
 
-**NOT READY for the authenticated managed target or confidential matters.** Offline synthetic engineering checks are executable and the later container/records probes below pass. The target login remains incomplete and the required nested sandbox fails on this host. Supplier/legal and accepted records requirements apply before confidential use; the historical internal-beta waivers in the release checklist are preserved and do not approve client material. See [remaining issues](INTERNAL_MVP_REMAINING_ISSUES.md) for the exact outstanding actions.
+**NOT READY for the authenticated managed target or confidential matters.** Offline synthetic engineering checks and the later container/records probes pass. The owner has now authenticated the separate synthetic harness: live E2E passes 13 checks, conduct passes six samples and installation diagnostics pass. The required nested sandbox still fails on the managed target host. Supplier/legal and accepted records requirements apply before confidential use; the historical internal-beta waivers in the release checklist are preserved and do not approve client material. See [remaining issues](INTERNAL_MVP_REMAINING_ISSUES.md) for the exact outstanding actions.
 
 The product is a Claude Code configuration/policy bundle, not a web application. There is no API server, application authentication database, migration, queue, production web build or public onboarding. Claude provides authentication and model services. The shipped programs generate/validate configuration, enforce hook-level matter checks, copy transcripts and verify release artifacts. The compliance skill governs suggested behavior; practitioner verification remains necessary.
 
@@ -81,7 +81,7 @@ Severity here uses the requested internal-MVP scale. Historical critical/high ra
 | CFG-04 | Fixed / P1 deployment | PARTIALLY FIXED | Atomic renderer, no-clobber output and generated/verified artifact hashes exist; manifest verifies embedded/standalone sandbox equality. External signing, immutable installation and rollback acceptance remain MVP-01. |
 | CFG-05 | Fixed / P1 deployment | PARTIALLY FIXED | Production preflight refuses native Windows and non-Linux target hosts; portable template generation remains available. An external launcher must prevent bypass of that preparation step: MVP-01. |
 | CFG-06 | Fixed / P1 deployment | PARTIALLY FIXED | Managed-only controls and allow/deny directions checked against actual sandbox schema; broad read roots, exclusions, Unix sockets and disabled filesystem controls rejected. Host enforcement remains MVP-01. |
-| CFG-07 | P1 deployment | PARTIALLY FIXED | Minimum 2.1.251, explicit actual client version and coherent declared range validated in manifest. Native live hook evidence is 2.1.263; the upper cap is not blanket compatibility proof. Accepted deployment version/effective settings remain MVP-01. |
+| CFG-07 | P1 deployment | PARTIALLY FIXED | Minimum 2.1.251, explicit actual client version and coherent declared range validated in manifest. Native Windows and Linux-container synthetic live hook evidence use 2.1.263; the upper cap is not blanket compatibility proof. Accepted deployment version/effective settings remain MVP-01. |
 
 ### Tests and CI
 
@@ -89,8 +89,8 @@ Severity here uses the requested internal-MVP scale. Historical critical/high ra
 |---|---|---|---|
 | TST-01 | Fixed | FIXED | Concurrent binding and archive retry tests plus additional 200/20-pair stress runs. |
 | TST-02 | Fixed | FIXED | Multiple roots, ancestor folders, nested roots and root ordering covered by process-level regressions. |
-| TST-03 | P1 deployment | PARTIALLY FIXED | Live test now requires successful model JSON, hook event/decision evidence, same-matter read and archived transcript; a missing credential/result cannot pass. OS access observation and sabotaged-hook controls remain MVP-01. |
-| TST-04 | P1 deployment | PARTIALLY FIXED | Native Windows live hook integration executed successfully; Linux/WSL attempt exposed expired OAuth. Offline tests cannot authorize a deployed host; run authenticated acceptance on the selected host (MVP-01). |
+| TST-03 | P1 deployment | PARTIALLY FIXED | Live test now requires successful model JSON, hook event/decision evidence, same-matter read and archived transcript; a missing credential/result cannot pass. Thirty-five offline boundary checks now include OS observation and sabotaged-hook controls; authenticated managed-target/approved-egress acceptance remains MVP-01. |
+| TST-04 | P1 deployment | PARTIALLY FIXED | Native Windows live evidence is retained historically. The later Linux-container run on Claude 2.1.263 passes 13 live E2E checks and six conduct samples after owner login. Installed managed-target acceptance remains MVP-01; the earlier expired-OAuth attempt is preserved in historical verification. |
 | TST-05 | P3 | ACCEPTED FOR INTERNAL MVP | Expanded adversarial regression, syntax/schema and conversion checks cover identified defects. No dedicated fuzz/coverage framework or type checker is claimed; optional future regression work is listed in remaining issues. |
 | TST-06 | Fixed | FIXED | GitHub status and protection inspected directly. Baseline run linked above; final delivery CI evidence is recorded in the PR checks and verification section. |
 
@@ -245,3 +245,22 @@ The documented generator and renderer then produced a separate clean synthetic b
 Production preflight was executed in a disposable instance of the same image, with the real installed hook/settings paths and the clean checkout mounted read-only. It exited 1 with **73 unresolved governance errors**, all from the real registers. There were no missing installed-hook, Git-origin or expired-workflow-observation errors. An earlier source-only snapshot produced 75 errors, including two packaging/freshness errors; the complete clean checkout and freshly observed disabled-workflow record corrected those and the command was rerun. Synthetic fixture production preflight passed in the full runner, as expected; no real register was filled to achieve that pass.
 
 All five required checks passed for candidate `a55e88c`: [CI run 34172769618](https://github.com/jakelawllm/claude-settings/actions/runs/34172769618). The final documentation commit is subsequently checked through [PR 23 checks](https://github.com/jakelawllm/claude-settings/pull/23/checks). This historical candidate result does not claim a future commit's pass. Optional live container E2E/conduct and installed `/status` remain unexecuted because target authentication is incomplete; nested sandbox, launcher/signature and approved live-egress acceptance remain open.
+
+
+## 2026-09-08 authenticated synthetic follow-up
+
+This later observation supersedes earlier statements that the synthetic authentication container is logged out or its live harnesses are unexecuted. The owner completed interactive login in the prepared container. Source commit `a4bb7adc85aa` was clean, PR 23 remained open, and both the required CI jobs and CodeQL analyses were green before this documentation update. SHA-256 comparison confirmed that the installed hook, live harnesses and compliance skill exactly matched that source before model calls.
+
+| Executed command | Actual result |
+|---|---|
+| Target `claude auth status --json`, filtered to login/method | `loggedIn=true`, `authMethod=claude.ai`; no account identifiers, login codes or tokens retained in the report or evidence logs; login state stays in the private authentication volume. |
+| `docker exec mvp-auth-20260908 claude --version` | Exit 0; 2.1.263. |
+| `docker exec -e CLAUDE_E2E=1 mvp-auth-20260908 node /opt/claude-settings/tests/e2e.test.js` | Exit 0; 13 passed, 0 failed. Actual SessionStart, same-matter Read, SessionEnd archive persistence and cross-matter Read/Grep denials observed. |
+| `docker exec -e CLAUDE_COMPLIANCE_LIVE=1 mvp-auth-20260908 node /opt/claude-settings/tests/compliance-live.js` | Exit 0; six passed, zero failed. All samples invoked the actual Skill tool; the captured synthetic answers were reviewed. |
+| `docker exec mvp-auth-20260908 claude doctor` | Exit 0; npm-global 2.1.263, auto-updates deliberately disabled, no installation issues found. |
+
+Conduct samples cover ordinary correspondence with a verification worklist and incomplete record, quoted instruction injection, affidavit/witness drafting, cross-examination evidence generation, expert-report drafting with claimed leave, and a knowingly invented citation. This is bounded sampled behavior, not general policy or legal certification. Raw synthetic answers and logs remain in the controlled evidence archive. The Docker copy API did not expose the tmpfs results file; reading that explicitly named synthetic output through `docker exec` recovered it successfully. No authentication volume or credential file was copied. Follow-up documentation checks resolved 72 local Markdown links; history scanning and whitespace validation exited 0. Repository code is unchanged in this follow-up.
+
+Independent host diagnosis reproduced `clone(CLONE_NEWNS|CLONE_NEWUSER)` returning `EPERM` under the retained default container profiles. User namespaces are globally enabled, but Ubuntu's unprivileged-user-namespace AppArmor policy separately denies capabilities; no matching bwrap-specific host profile was available. Scoped administrative profile inventory/load access is unavailable to the review account. No safe image-only fix was established. The [runbook](synthetic-container-checks.md) gives the supported administrator investigation and verification sequence without global policy disablement, broad privileges or sandbox fallback.
+
+**Decision remains NOT READY for the managed target or confidential matters.** Authentication and the synthetic live harnesses are complete. Installed organisation-bound managed settings, the required nested sandbox, external launcher/signature and approved live-egress acceptance remain open, along with owner prerequisites before confidential use. No owner-required register row was filled. The authentication container has ordinary bridge egress and no managed-policy mount; its successful calls do not certify those other boundaries.

@@ -42,7 +42,7 @@ python3 records-drill/reproduce.py
 
 The first script checks actual child-process file access with strace and a host inotify observer. Positive controls must detect an actual sibling-canary read before and after the denial probes. It repeats the probes with the copied allow-all guard, checks credential/socket absence, offline IPv4/IPv6 connection failure, policy permissions and restart persistence. These are OS observations of synthetic subprocesses, not authenticated Read/Grep/Glob calls or external launcher acceptance.
 
-The records drill uses genuine nonroot hook subprocesses, failed permissions, an interrupted partial write, retry from preserved source, backup restore and cross-UID access denial. It provides engineering evidence only: no live client SessionEnd, supervised records service, independent backup destination, encryption, retention/hold policy or owner approval is inferred.
+The records drill uses genuine nonroot hook subprocesses, failed permissions, an interrupted partial write, retry from preserved source, backup restore and cross-UID access denial. It provides direct-hook engineering evidence only. The separate live harness subsequently verified temporary SessionEnd archive persistence, but no filing from the accepted managed target into approved records storage, supervised records service, independent backup destination, encryption, retention/hold policy or owner approval is inferred.
 
 Results must name failures and environmental limits. The development manifest uses `--allow-dirty` during generation and verification; that label must not be promoted to a clean signed release. Once the complete intended checkout is committed and clean, generate a new clean release candidate and verify it separately. This was subsequently executed from clean candidate `a55e88c`, without `--allow-dirty`; the unsigned synthetic manifest verified. It does not approve deployment or replace the remaining host/account checks.
 
@@ -61,7 +61,7 @@ docker exec -e CLAUDE_E2E=1 mvp-auth-20260908 node /opt/claude-settings/tests/e2
 docker exec -e CLAUDE_COMPLIANCE_LIVE=1 mvp-auth-20260908 node /opt/claude-settings/tests/compliance-live.js
 ```
 
-These model calls spend tokens. A successful login or harness does not establish the installed managed organisation restriction. The rendered offline bundle uses a synthetic organisation UUID; actual account-bound settings require the intended organisation identifier and observed `/status` on the accepted target.
+The owner completed this login on 2026-09-08. The actual 2.1.263 client then passed all 13 E2E checks and all six conduct samples; `claude doctor` exited 0 with no installation issues. Synthetic output was reviewed and retained externally. These model calls spend tokens. A successful login or harness does not establish the installed managed organisation restriction. The rendered offline bundle uses a synthetic organisation UUID; actual account-bound settings require the intended organisation identifier and observed `/status` on the accepted target.
 
 ## Nested sandbox failure
 
@@ -73,8 +73,21 @@ docker exec mvp-acceptance bwrap --unshare-user --ro-bind / / -- true
 
 Default container controls refused namespace creation. Disposable no-data diagnostic containers also failed under individual seccomp/AppArmor relaxations; those diagnostic settings are not used by the candidate. The final candidates retain Docker's default profiles, all capability drops and no-new-privileges.
 
-A host administrator must provide a supported scoped namespace/sandbox configuration or another accepted host, then repeat this probe, `claude doctor`, installed-client `/status` and [every OS acceptance row](os-isolation-acceptance.md). Do not change `failIfUnavailable`, disable the nested sandbox, add broad privileges or relax production preflight to turn this failure into a pass.
+A fresh disposable probe traced `clone(CLONE_NEWNS + CLONE_NEWUSER)` returning `EPERM`. Ubuntu user namespaces are enabled, but the host's separate unprivileged-user-namespace AppArmor profile denies capabilities; no applicable bwrap-specific host profile was available. Image packages alone cannot change that host policy.
+
+A host administrator must inspect `sudo aa-status`, installed AppArmor/parser versions and the kernel denial records. Using the installed versions, review a separately named confined AppArmor profile and corresponding narrow seccomp allowances for the candidate's namespace/setup operations. The loaded-profile inventory and privileged loading are unavailable to this review account, so a complete policy is not invented here. Do not copy an upstream profile for an incompatible ABI.
+
+Load only the reviewed named profile and test it with the pinned image, preserving the existing restrictions:
+
+```text
+sudo apparmor_parser -r -W /controlled/claude-mvp-bwrap.apparmor
+docker run --rm --network none --read-only --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges --security-opt apparmor=claude-mvp-bwrap --security-opt seccomp=/controlled/claude-mvp-seccomp.json PINNED_IMAGE_ID bwrap --unshare-user --ro-bind / / -- true
+```
+
+These are administrator next steps, not executed passes; the reviewed files must exist first. Require exit 0 and inspect the remaining denials. Apply the reviewed profiles only to the acceptance candidate, then rerun all boundary/observer/negative-control and restart checks, `claude doctor`, installed-client `/status` and [every OS acceptance row](os-isolation-acceptance.md). A supported alternate host is the alternative if the current host cannot meet those requirements. Do not change `failIfUnavailable`, disable the nested sandbox, add broad privileges or relax production preflight to turn this failure into a pass.
 
 For the offline candidate, stop with `docker stop mvp-acceptance` and resume with `docker start mvp-acceptance`; its private state volume is retained. Do not delete old containers, volumes, source transcripts or quarantined partial files as a recovery step. Preserve the authentication home and records evidence separately from source control.
 
 Runtime reference: [Claude installation and version verification](https://code.claude.com/docs/en/setup). Container option reference: [Docker run](https://docs.docker.com/engine/containers/run/) and [bind mounts](https://docs.docker.com/engine/storage/bind-mounts/).
+
+Host policy references: [Docker named AppArmor profiles](https://docs.docker.com/engine/security/apparmor/#load-and-unload-profiles), [Docker seccomp restrictions](https://docs.docker.com/engine/security/seccomp/) and [Ubuntu user-namespace restrictions](https://discourse.ubuntu.com/t/understanding-apparmor-user-namespace-restriction/58007).
