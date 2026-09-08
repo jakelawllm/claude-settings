@@ -2,7 +2,9 @@
 
 **Assessment date:** 2026-09-08
 
-**Assessed code commit:** `9a0372a123d1f038378bb6360806c139cfed2f61`
+**Assessed repository code commit:** `a6e28e079a0b`
+
+**Managed deployment source:** `9a0372a123d1f038378bb6360806c139cfed2f61`
 
 **Baseline:** `e25608d975ef58d31bd4ff7984eabb0622046b22` on `main`
 
@@ -100,7 +102,7 @@ Severity here uses the requested internal-MVP scale. Historical critical/high ra
 |---|---|---|---|
 | SUP-01 | Fixed | FIXED | Existing real hash lock was newer than the report; added missing conditional Windows `colorama`. Fresh installation with `--require-hashes` and `pip check` executed. |
 | SUP-02 | Fixed | FIXED | Cached schema and validator dependencies pinned; LF attributes preserve raw schema hash on Windows. No network schema download during verification. |
-| SUP-03 | P2/P3 limitation | PARTIALLY FIXED | History/content/filename/ref/tag and current/historical Office XML scans strengthened; allowlist, added-line, split-run/entity and redaction regressions added. Malformed/shallow input fails. Heuristics cannot establish absence of every possible encoded secret; GitHub secret scanning and push protection were also verified enabled; no scanner guarantees every arbitrary encoding. |
+| SUP-03 | P3 heuristic limitation | ACCEPTED FOR INTERNAL MVP | Full history, independent index/current changes, nonignored new text and staged/current Office XML scans strengthened; allowlist, added-line, split-run/entity and redaction regressions added. Malformed/shallow input fails. Heuristics cannot establish absence of every possible encoded secret; GitHub secret scanning and push protection were also verified enabled; no scanner guarantees every arbitrary encoding. |
 | SUP-04 | None | INVALID OR NO LONGER APPLICABLE | Unpinned plugin-download review workflow was removed before this baseline. Current Actions are SHA-pinned. |
 | SUP-05 | P2 optional feature | ACCEPTED FOR INTERNAL MVP | GitHub workflow 322652643 was disabled during this review and its API state verified as disabled_manually; candidate YAML additionally requires an explicit enable variable. Expired recorded token-rotation date is not fabricated or updated. A same-day, artifact-bound disablement record is accepted by preflight; rotate/record before optional activation; this secret is unnecessary for offline or local authenticated tests. |
 | SUP-06 | Fixed / optional live test | PARTIALLY FIXED | Verified remotely disabled, additionally requires explicit opt-in, verifies trusted association and current write permission, explicitly passes a read-only GitHub token and grants no OIDC permission. The explicit token prevents broader app-token minting. The fixed prompt is not a general code-execution sandbox; optional enablement still requires controlled acceptance. Optional credentialed workflow has not been enabled/tested. |
@@ -321,6 +323,27 @@ Raw terminal output was kept only in memory and not retained. The incomplete int
 
 After the host/runbook reconciliation, `python scripts/verify.py` was executed with the repository's hash-installed Python 3.12.3 environment and Node 22.23.2: exit 0, all 12 offline Node suites (718 assertions), eight Python link regressions, zero failures and zero Linux skips. All 75 repository Markdown links resolve. Dependency consistency, syntax, schema/hash, DOCX parity, references, history/Office scanning, synthetic production preflight and manifest checks passed through that runner. Full output is retained privately at `acceptance/final-repository-verify.log`, SHA-256 `7a6e3c5c65e5a445cfbb8328d3f9510c0011fc077ebc9c04520df8207eea74e6`.
 
-`python -W error tests/verify-local-links.test.py` separately passed eight cases; `git diff --check` passed after removing Markdown hard-break whitespace. The initial ad-hoc invocation of a nonexistent standalone `scripts/verify-local-links.py` was corrected to the actual `scripts.verify.local_links` function, which passed all 75 links; no such nonexistent command is documented as supported. All 44 original audit IDs remain present exactly once in the current reconciliation. No code or control bytes changed after the assessed source commit; final documentation is checked again by [PR 23 CI](https://github.com/jakelawllm/claude-settings/pull/23/checks).
+`python -W error tests/verify-local-links.test.py` separately passed eight cases; `git diff --check` passed after removing Markdown hard-break whitespace. The initial ad-hoc invocation of a nonexistent standalone `scripts/verify-local-links.py` was corrected to the actual `scripts.verify.local_links` function, which passed all 75 links; no such nonexistent command is documented as supported. All 44 original audit IDs remain present exactly once in the current reconciliation. That precommit result covered the then-committed history; the subsequent CI discovery and scanner correction below supersede its pending-change coverage. Final documentation is checked again by [PR 23 CI](https://github.com/jakelawllm/claude-settings/pull/23/checks).
 
 Outstanding or unavailable checks are explicit: interactive `/status` awaits the normal owner OAuth/security-notes sequence; real governance preflight still refuses 73 incomplete fields; two proc files do not exist on this kernel; original-host/key-loss recovery has not been accepted or demonstrated. Optional credentialed GitHub automation remains disabled. There is no database/migration, web server/build, separate linter/type checker or formatter command to report as passed. Earlier Windows-only platform skips remain historical; none were skipped in this final Linux suite.
+
+### CI regression and pending-change scanner correction
+
+[CI run 34186992351](https://github.com/jakelawllm/claude-settings/actions/runs/34186992351) at `0c6d11e` failed its secret-scan and settings/policy jobs. All flagged values were verified public commit/artifact digests in the new evidence documents. The precommit runner had scanned committed history, so those then-uncommitted references were outside its scope. The original failed run and initial verification log remain preserved.
+
+Commit `a6e28e079a0b` fixes that gap. The text scanner's `--worktree` mode checks staged and unstaged changes independently and Git-listed nonignored new text. The Office scanner separately checks staged blobs and Git-selected current/new Office files, replacing recursive discovery that could enter ignored runtime directories. Both refuse incomplete Git/read states, avoid following untrusted symlinks and retain redacted failure output. A staged disclosure removed only from disk is still detected. Force-staged ignored files remain candidates; ignored private runtime trees are not traversed.
+
+Nine exact public references were independently verified against their commit objects, Docker identity or protected artifact bytes. Their exceptions apply only to the exact token, named evidence-document paths and entropy label; no arbitrary hexadecimal string, neighbouring secret, credential-shaped match or whole document is exempted. The standard runner and dedicated CI scan use the new modes. Both scanner regression suites now run in the existing Linux/macOS/Windows jobs, in separate steps so a later PowerShell command cannot hide an earlier failure.
+
+| Executed corrected check | Result |
+|---|---|
+| `node tests/scan-history.test.js` with the venv Python selected | 106 passed, 0 failed, 0 skipped on Linux. |
+| `node tests/scan-docx-xml.test.js` with the venv Python selected | 54 passed, 0 failed, 0 skipped on Linux. |
+| `python scripts/verify.py` after both corrections | Exit 0; 12 Node suites, 788 assertions, eight Python regressions, 75 local links, zero failures/Linux skips. Evidence: `acceptance/verify-pending-scans-20260908.log`; the earlier log was not overwritten. |
+| `python scripts/scan-history.py --worktree` after staging the complete fix | Exit 0; committed history, index and working files checked. |
+| `python scripts/scan-docx-xml.py --history --worktree` after staging | Exit 0; two working Office files, two independent index blobs and eight historical blobs checked. |
+| `git diff --cached --check` | Exit 0. |
+
+Regression cases include staged-only and new disclosures, clean/deleted working copies that differ from the index, ignored-runtime pruning, explicitly tracked ignored paths, symlink and parent-path refusals, hostile filenames, malformed/unreadable Git states and redaction. Unavailable Windows symlink creation is explicitly counted if encountered; Linux exercised every new case. Final cross-platform results are attached to [PR 23 checks](https://github.com/jakelawllm/claude-settings/pull/23/checks).
+
+Only verification tools, their CI wiring and documentation changed after the managed deployment source. Its installed control and generator/renderer bytes remain unchanged; the signed runtime evidence retains its original source and manifest instead of being relabelled as a newly deployed release. Interactive onboarding and actual confidential-use adoption remain the only recorded external blockers.

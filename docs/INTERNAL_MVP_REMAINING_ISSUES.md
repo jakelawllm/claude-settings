@@ -4,11 +4,11 @@
 
 **Status:** NOT READY
 
-**Assessed commit:** `9a0372a123d1f038378bb6360806c139cfed2f61`
+**Assessed commit:** `a6e28e079a0b`
 
 **Assessment date:** 2026-09-08
 
-The controlled authenticated command workflow passes, but interactive onboarding and `/status` remain incomplete. Confidential-matter use is additionally blocked by the two adoption requirements below. Executed evidence covers actual installed controls, sandbox and sibling isolation, restricted egress, signed launch, SessionEnd filing and encrypted independent-machine restore in the [assessment](INTERNAL_MVP_READINESS_REPORT.md) and [operator runbook](synthetic-container-checks.md). Technical repairs formerly listed as MVP-01 are recorded there rather than retained as unfinished work. Responsible-owner approvals are not inferred from engineering results.
+The controlled authenticated command workflow passes, but interactive onboarding and `/status` remain incomplete. Confidential-matter use is additionally blocked by the two adoption requirements below. Executed evidence covers actual installed controls, sandbox and sibling isolation, restricted egress, signed launch, SessionEnd filing and encrypted independent-machine restore in the [assessment](INTERNAL_MVP_READINESS_REPORT.md) and [operator runbook](synthetic-container-checks.md). Technical repairs formerly listed as MVP-01 are recorded there rather than retained as unfinished work. Responsible-owner approvals are not inferred from engineering results. The protected `OWNER-REVIEW.md` maps all 12 operational rows to existing observations and the exact decisions still needed.
 
 ## Internal-MVP blockers requiring human or external action
 
