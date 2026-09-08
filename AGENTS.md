@@ -28,6 +28,8 @@ Live `CLAUDE_E2E=1 node tests/e2e.test.js` is separate, uses synthetic data, req
 - Do not weaken production governance gates or fabricate owners, evidence, approvals or test passes. Synthetic fixtures exercise validation, not approval.
 - Matter roots are parent directories containing matter folders. A single-matter sandbox root is the selected child directory. Keep these distinct.
 - State persists across hook invocations. Do not discard or infer corrupt bindings; old central archives require an operator-controlled migration (see operations).
+- Keep agent runtime directories such as `.claude-orch/` ignored. Build inspection snapshots from explicitly selected tracked files; never include a private agent home or authentication volume.
+- Container ownership checks must include the runtime UID, effective parent-directory permissions and actual mount read-only flags. Never treat an offline network-none probe as an authenticated approved-egress test.
 - Rendered settings, state, transcripts, real organisation identifiers and credentials must stay out of Git. Use only synthetic test data. Scanners must not print matched secrets, including secrets in filenames or exception text.
 - Pin Actions by full SHA and Python dependencies with hashes; preserve Windows conditional dependencies when regenerating the lock.
 

@@ -99,7 +99,7 @@ Status: DISABLED
 - Workflow SHA-256 (LF): 649d3a459ff0e903e237d9a8924927344be095d58ac2681cce914149ee0aeb90
 - Evidence source: https://api.github.com/repos/jakelawllm/claude-settings/actions/workflows/claude.yml
 - Observed by: Authenticated repository-maintainer tooling during internal-MVP review
-- Verified date: 2026-09-07
+- Verified date: 2026-09-08
 
 This records observed remote disablement, not principal approval, token rotation or issuer-side revocation. It makes no assumption about inherited organisation variables or absent credentials. The workflow hash binds this review to the candidate checkout after CRLF-to-LF normalization. Production preflight accepts this disposition only on the recorded UTC date and for the matching GitHub origin and workflow artifact. It checks the record locally; it does not query GitHub or prove that remote state has remained unchanged.
 

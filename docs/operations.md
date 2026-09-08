@@ -46,6 +46,8 @@ Start Claude in the selected matter directory. Ask for a summary of a synthetic 
 
 Run the live harness separately using the command in README. Its temporary settings test hook integration and do not replace managed host acceptance.
 
+See [synthetic container checks](synthetic-container-checks.md) for mount syntax, effective parent-directory permissions, separate authentication and offline boundaries, and the observed nested-sandbox startup failure.
+
 ## Failure and recovery
 
 | Symptom | Action and verification |

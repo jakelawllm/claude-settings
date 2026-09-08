@@ -1,8 +1,8 @@
 # Internal MVP Readiness Report
 
-**Assessment date:** 2026-09-07
+**Assessment date:** 2026-09-08
 
-**Assessed code commit:** `0d6b842`
+**Assessed code commit:** `8ec769a1e50f`
 
 **Baseline:** `e25608d975ef58d31bd4ff7984eabb0622046b22` on `main`
 
@@ -10,11 +10,11 @@
 
 ## Decision and scope
 
-**NOT READY for an internal test using confidential matters.** The repository's synthetic engineering workflow is executable, but no accepted managed/container deployment, actual supplier/legal approval or operational records evidence has been supplied. These are practical confidentiality and recovery requirements for trusted users, not enterprise scale or public-launch requirements. See [remaining issues](INTERNAL_MVP_REMAINING_ISSUES.md) for the three external blockers and exact acceptance actions.
+**NOT READY for the authenticated managed target or confidential matters.** Offline synthetic engineering checks are executable and the later container/records probes below pass. The target login remains incomplete and the required nested sandbox fails on this host. Supplier/legal and accepted records requirements apply before confidential use; the historical internal-beta waivers in the release checklist are preserved and do not approve client material. See [remaining issues](INTERNAL_MVP_REMAINING_ISSUES.md) for the exact outstanding actions.
 
 The product is a Claude Code configuration/policy bundle, not a web application. There is no API server, application authentication database, migration, queue, production web build or public onboarding. Claude provides authentication and model services. The shipped programs generate/validate configuration, enforce hook-level matter checks, copy transcripts and verify release artifacts. The compliance skill governs suggested behavior; practitioner verification remains necessary.
 
-All safe repository-level defects identified in this assessment have been fixed or given a specific scoped disposition below. A successful synthetic run does not establish OS isolation, deployed tenant identity, supplier retention or legal approval.
+All safe repository-level defects identified in this assessment have been fixed or given a specific scoped disposition below. Historical verification sections retain their assessed commits; the dated follow-up distinguishes later results. A successful synthetic run does not establish OS isolation, deployed tenant identity, supplier retention or legal approval.
 
 ## Inputs and historical evidence
 
@@ -184,3 +184,53 @@ Final offline assertion breakdown (each command prefixed with `node tests/`):
 The mandatory suite covers configuration, subprocess errors, state persistence across processes, records retrieval, concurrency, archive failure/retry and release CLI integration. Native Windows necessarily skips POSIX-only filesystem cases; Linux executes them. Live model tests are optional in CI because they require an authenticated account and consume tokens. No database/migration, web UI, standalone formatter/linter/type-checker or compiled application exists; these checks are not reported as executed passes.
 
 The report commit is a documentation snapshot; the embedded commit identifier names the code actually assessed rather than claiming a self-referential Git hash. Final delivery CI also checks subsequent documentation commits.
+
+
+## 2026-09-07 engineering reconciliation
+
+This subsection records later engineering reconciliation without changing the historical verification record above.
+
+- A fresh PR-head bundle was staged under `/dev-data/evidence/staging-pr23-20260907-unique/` and labelled **DEVELOPMENT EVIDENCE — NOT RELEASE GRADE**. The sandbox hash is `--hash=sha256:7f376bb40206c008f7210fc999b9a5b442d87b3b55a6f976757925b5bbb9431a`. Manifest verification returned exit `0`, but recorded `claude_code_version` `2.1.263` remains **UNVERIFIED** because the target container has no Claude CLI installed and no repository mount.
+- The earlier live E2E/compliance claim is corrected to a host run with Claude `2.1.238`, below declared minimum `2.1.251`: E2E `13` passed / `0` failed, compliance `4` passed / `2` failed; `ordinary-client-email` and `cross-examination-evidence-generation` failed. Historical `2.1.263` results remain unchanged.
+- Installed bundle inventory shows root-owned files: managed settings `0644`, hook `0755`, skill `0644`. Installed-policy effectiveness and ownership acceptance remain unverified.
+- OS-isolation acceptance evidence is incomplete. External launcher is a repository non-goal. Sabotaged-guard negative control requires authorisation. Phase 2 interactive OAuth on target CLI was not completed.
+- MVP-03 records drill was not completed. No records-drills artifact was produced and no client-integrated records service was demonstrated; direct-hook stdin is not records acceptance. MVP-03 remains open; MVP-02 remains unchanged, open and blocking.
+- Decision remains **NOT READY**. Do not fill `OWNER-REQUIRED` rows or claim auth, container E2E, OS acceptance or records-service completion.
+
+
+## 2026-09-08 remote remediation and current evidence
+
+This section supersedes the current-state conclusions of the 2026-09-07 engineering reconciliation above without deleting its observations. Source code assessed: `8ec769a1e50f`. The original three modified files and new local-link test were preserved and reviewed. Open PRs, default branch and required CI were checked before edits; main was not merged or rewritten.
+
+### Fixed during this follow-up
+
+- **P1 — private runtime could be staged:** the untracked local agent home included authentication/session artifacts and was not ignored. Added `.claude-orch/` to Git exclusions without opening credentials. Inspection snapshots contain explicitly selected tracked source only.
+- **P2 — link verification traversed downloaded runtime documentation:** Git-aware discovery now covers tracked and new nonignored Markdown, including deliberately tracked `.claude/` documents. Ignored runtime caches are pruned. Eight regression cases cover cache exclusions, tracked documentation, invalid links, Git failure, deletion and unreadable files. An unstaged-deletion regression was reproduced and fixed; links to a deleted document still fail.
+- **P1 — candidate container protection was ineffective:** the old runtime was root, policy parent directories were writable by UID 65534, and the phase4 `--mount` destination literally contained `:ro` while remaining writable. The old containers are preserved and stopped; their original volume remains intact. The replacement runs UID 1000 with only Smith mounted, a read-only root/bundle, all capabilities dropped, no-new-privileges and no network. Installed Claude was actually executed as 2.1.263. The allow-all negative-control container is separate and stopped after testing.
+- **P2 — no completed synthetic records drill evidence:** 40 offline checks now demonstrate real hook lifecycle, persistent state, sibling refusal, archive hashes/idempotency, permission failure/retry, interruption after a partial write, source preservation, restore and cross-UID read denial. This closes the engineering evidence gap, not the external records-service/owner gate.
+
+### Executed follow-up validation
+
+| Command / integration path | Observed result |
+|---|---|
+| Fresh Python 3.12 venv, `python -m pip install --require-hashes -r requirements-lock.txt`; `python -m pip check` | Both exit 0; no broken requirements. |
+| `python scripts/verify.py` on Linux Node 22.23.2 / Python 3.12.3 | 12 offline Node suites: 718 assertions, 0 failures, 0 skips; 8 Python link regressions pass. Final full verification from the freshly restored environment exits 0; 71 repository Markdown links resolve. |
+| `python -W error tests/verify-local-links.test.py`; `git diff --check` | 8 passed, no warnings; whitespace check exits 0. The initial deletion reproduction failed as expected; the corrected implementation was rerun. |
+| `python3 offline-container-check.py` in the controlled evidence archive | 35 boundary checks and 5 oracle self-checks passed. Ten routes were exercised with normal and allow-all guards. Host inotify positive controls detected sibling opens/reads before and after; none occurred during denial probes. strace confirms target access errors on the same syscall line. |
+| `python3 records-drill/reproduce.py` in that archive | 40 passed, 0 failed, 0 skipped. Interrupted staging file was retained separately; complete retry and tar restore matched the preserved source. |
+| Manifest generation/verification with observed `--claude-code-version 2.1.263` and `--allow-dirty` | Exit 0 for development evidence. It is explicitly a dirty development snapshot, not a signed clean release. |
+| `docker exec mvp-acceptance bwrap --unshare-user --ro-bind / / -- true` | Exit 1: namespace creation denied. Remains open; no bypass applied. |
+| Target `claude auth status --json`, output filtered to login/method only | `loggedIn=false`, `authMethod=none`. No credential values read or copied. |
+| Authenticated GitHub workflow-state API query | Optional workflow 322652643 remains `disabled_manually`; current UTC observation refreshed. Historical rotation and approvals unchanged. |
+
+The first boundary script reported two archive failures because its trace selection omitted the failed stat syscall. The trace/oracle was corrected and every route rerun. Independent review then tightened the oracle to reject an unrelated missing-library error and made restart state use a fresh nonce; all checks passed again. Original logs/results remain in the controlled evidence archive.
+
+The source-controlled [runbook](synthetic-container-checks.md) records the actual boundary, commands and limitations. External evidence includes `offline-container-check.py`, `offline-container-results.json`, the pinned image Dockerfile/build log, `container-configuration.json`, `nested-sandbox-probe.txt` and the records-drill reproduction/results. No raw credentials, authentication home, real transcripts or private identifiers are included in this repository.
+
+### Still not established
+
+The live synthetic authentication container is prepared with a private persistent home and ordinary egress, but login is incomplete. Live E2E/conduct calls were not executed against it; no token-bearing host files were reused. Its unfiltered egress and absent managed bundle make it unsuitable as proof of a confidential managed target.
+
+The hardened offline candidate's nested sandbox is unavailable. Disposable no-data diagnostics with individual profile relaxations also failed; final candidates retain the default profiles and `failIfUnavailable` remains enforced. A supported scoped host configuration, authenticated installed-policy observation, real launcher/signature checks and approved-egress acceptance remain necessary. The outer Docker probes do not claim those passes.
+
+Records results are direct hook engineering tests, not a live client SessionEnd or approved records service. Supplier/legal/data-flow, retention/hold, actual storage and release-owner facts remain unresolved. No `OWNER-REQUIRED` evidence row was populated and no historical approval was fabricated.

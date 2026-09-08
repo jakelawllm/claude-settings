@@ -125,6 +125,7 @@ The expert-report prohibition is intentional: [Option A](docs/policy-decisions/e
 - [Architecture](docs/production-architecture.md), [operations](docs/operations.md) and [configuration](docs/environment.md)
 - [Security and private reporting](SECURITY.md)
 - [Release checklist](docs/release-checklist.md) and [operational evidence](docs/operational-evidence-register.md)
+- [Synthetic container checks and recovery](docs/synthetic-container-checks.md)
 - [Change history](CHANGELOG.md)
 
 MIT. Published for reference and adaptation; external contributions are not monitored.

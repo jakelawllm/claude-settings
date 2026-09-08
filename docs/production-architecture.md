@@ -26,7 +26,7 @@ The manifest records the supplied actual client version, version range and artif
 
 ## Enforcement boundaries
 
-1. **OS/container isolation:** primary filesystem/network boundary for interpreters. Only selected matter and approved tooling may be visible.
+1. **OS/container isolation:** primary filesystem/network boundary for interpreters. Only selected matter and approved tooling may be visible. Protect the managed bundle and its parent directories against replacement by the runtime UID; a read-only mount and nonroot process must be verified at the target.
 2. **Managed settings and hook:** client controls and accidental cross-matter defense. PreToolUse has wildcard matcher; unknown tools default-deny. Bash is checked by cwd, not command parsing. LSP uses its filePath.
 3. **Compliance skill:** model instructions for output and practitioner records. Static tests check its text; they do not establish behavioral or legal compliance.
 
@@ -66,3 +66,7 @@ The version range is a declared policy limit; neither the minimum nor maximum is
 ## Scope of the internal MVP
 
 Offline synthetic verification is implemented. Live hook transport and model behavior require an authenticated CLI. Installed managed policy, container isolation, records ingestion and legal/supplier approval are separate acceptance tasks. See [readiness](INTERNAL_MVP_READINESS_REPORT.md), [remaining issues](INTERNAL_MVP_REMAINING_ISSUES.md) and [release checklist](release-checklist.md).
+
+## Later synthetic engineering evidence
+
+The 2026-09-08 [container checks](synthetic-container-checks.md) exercise a protected offline single-matter container and a copied sabotaged guard. A separate authentication container has ordinary egress and no managed bundle. These observations do not complete the external launcher, nested-sandbox availability, authenticated managed-policy or approved-egress requirements above. Synthetic filing/recovery probes similarly do not constitute an accepted records service.
