@@ -78,6 +78,21 @@ class LocalLinksTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, r"absent\.md"):
             verify.local_links()
 
+    def test_deleted_tracked_document_is_skipped_but_links_to_it_fail(self) -> None:
+        self.write("docs/removed.md", "# Removed document\n")
+        self.git("add", "docs/removed.md")
+        (self.root / "docs/removed.md").unlink()
+        verify.local_links()
+        self.write("README.md", "[removed](docs/removed.md)\n")
+        with self.assertRaisesRegex(RuntimeError, r"broken local link: README\.md -> docs/removed\.md"):
+            verify.local_links()
+
+    def test_unreadable_document_is_not_silently_skipped(self) -> None:
+        self.write("README.md", "# Document\n")
+        with patch.object(Path, "read_text", side_effect=PermissionError("fixture unreadable")):
+            with self.assertRaises(PermissionError):
+                verify.local_links()
+
     def test_git_listing_failure_is_not_a_pass(self) -> None:
         with patch.object(verify.subprocess, "run", return_value=subprocess.CompletedProcess(
                 ["git"], 1, stdout="", stderr="fixture failure")):

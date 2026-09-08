@@ -48,6 +48,12 @@ def local_links() -> None:
     count = 0
     for relative_path in sorted(set(result.stdout.split("\0")) - {""}):
         path = ROOT / relative_path
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            # Git still lists unstaged deletions; remaining links to them fail
+            # below. Do not suppress unreadable files or broken symlinks.
+            continue
         text = re.sub(r"```.*?```", "", path.read_text(encoding="utf-8"), flags=re.S)
         for target in re.findall(r"\]\((<[^>]+>|[^\s)]+)(?:\s+\"[^\"]*\")?\)", text):
             target = target.strip("<>")
