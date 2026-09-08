@@ -30,6 +30,9 @@ Live `CLAUDE_E2E=1 node tests/e2e.test.js` is separate, uses synthetic data, req
 - State persists across hook invocations. Do not discard or infer corrupt bindings; old central archives require an operator-controlled migration (see operations).
 - Keep agent runtime directories such as `.claude-orch/` ignored. Build inspection snapshots from explicitly selected tracked files; never include a private agent home or authentication volume.
 - Container ownership checks must include the runtime UID, effective parent-directory permissions and actual mount read-only flags. Never treat an offline network-none probe as an authenticated approved-egress test.
+- Protect host ancestors of the launcher, verification key, bundle and selected matter from group/world replacement; a private child beneath a writable parent is insufficient. Keep signing keys outside runtime mounts.
+- Verify the actual managed Bash tool result, installed Skill invocation and SessionEnd archive. A zero client exit can contain a failed tool result; a standalone bubblewrap probe can pass while the client shell or dynamic loader is hidden.
+- Diagnostic argv/environment can contain ephemeral proxy credentials. Allowlist filesystem/namespace fields before printing or saving; never retain full execve arguments or authentication output.
 - Rendered settings, state, transcripts, real organisation identifiers and credentials must stay out of Git. Use only synthetic test data. Scanners must not print matched secrets, including secrets in filenames or exception text.
 - Pin Actions by full SHA and Python dependencies with hashes; preserve Windows conditional dependencies when regenerating the lock.
 

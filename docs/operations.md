@@ -46,7 +46,7 @@ Start Claude in the selected matter directory. Ask for a summary of a synthetic 
 
 Run the live harness separately using the command in README. Its temporary settings test hook integration and do not replace managed host acceptance. Confirm the installed compliance skill appears in `/skills` and invoke it through the actual Skill tool without `--plugin-dir`; the separate conduct harness side-loads a plugin and cannot establish managed-skill discovery.
 
-See [synthetic container checks](synthetic-container-checks.md) for mount syntax, effective parent-directory permissions, separate authentication and offline boundaries, and the observed nested-sandbox startup failure.
+See [synthetic container checks](synthetic-container-checks.md) for mount syntax, effective parent-directory permissions, separate authentication and offline boundaries, and the subsequently repaired nested sandbox. The pinned test image requires its documented filesystem layout and host profiles; do not substitute an image merely because a standalone bubblewrap probe passes.
 
 ## Failure and recovery
 

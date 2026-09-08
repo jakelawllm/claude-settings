@@ -35,3 +35,9 @@ Completion of this register does not itself authorise production go. The product
 ## 2026-09-07 engineering evidence boundary
 
 See [current readiness](INTERNAL_MVP_READINESS_REPORT.md) for executed synthetic checks. This register intentionally remains uncompleted: local hook invocation and a JSONL copy are not proof of the installed managed bundle, signature, external records service or host isolation. Do not copy synthetic fixture approvals into these entries.
+
+## 2026-09-08 observed engineering evidence for owner review
+
+The later [managed container checks](synthetic-container-checks.md) supersede the earlier absence of host evidence: actual normal and sabotaged-guard sessions each passed 44 checks, with five additional tool-result assertions per saved run, a live sibling-inode observer and successful positive controls. The exact client is 2.1.263 on the pinned Linux container image. Installed Skill invocation, actual SessionEnd filing, missing-bubblewrap startup refusal and an encrypted synthetic-archive round trip to an independent Windows machine were executed. The latter passed seven checks with its recovery key retained on the source host.
+
+These references supply observations for review; they do not name a responsible practice owner, approve a signing key for confidential deployment, certify other versions/platforms, establish key escrow or adopt retention/legal-hold rules. The completion rows above remain unresolved until the accountable owner records those decisions. Do not repeat completed engineering checks merely to substitute an owner name, and do not copy synthetic fixture approvals into this register. Current signed-launch/restart evidence and any still-unexecuted manual item are maintained in the linked runbook and [remaining issues](INTERNAL_MVP_REMAINING_ISSUES.md).
