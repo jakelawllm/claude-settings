@@ -22,7 +22,7 @@ python3 scripts/render-production-settings.py \
   --firm-name "<practice name>" \
   --org-uuid "<Claude org UUID>" \
   --matter-roots "<absolute matter root>[;<alias>]" \
-  --otel-endpoint "https://<collector>/v1/traces" \
+  --otel-endpoint "https://<collector>" \
   --sandbox-policy dist/sandbox-policy.json
 
 python3 scripts/preflight-validate.py --mode production dist/managed-settings.production.json
@@ -33,31 +33,31 @@ If telemetry is deliberately disabled, use `--disable-telemetry` and record the 
 ## 3. Generate and verify the manifest
 
 ```bash
-python3 scripts/generate-release-manifest.py \
+python3 scripts/generate-release-manifest.py --claude-code-version "<actual tested version>" \
   --output dist/release-manifest.json \
   --production-settings dist/managed-settings.production.json \
   --sandbox-policy dist/sandbox-policy.json
 
-# If the working tree is dirty and the deployment process deliberately accepts that state:
+# Development evidence only: --allow-dirty must never label a deployable release.
 #   python3 scripts/generate-release-manifest.py --allow-dirty ...
 
-python3 scripts/generate-release-manifest.py \
+python3 scripts/generate-release-manifest.py --claude-code-version "<actual tested version>" \
   --verify \
   --output dist/release-manifest.json \
   --production-settings dist/managed-settings.production.json \
   --sandbox-policy dist/sandbox-policy.json
 ```
 
-The manifest records hashes of the hook, settings template, rendered production settings, compliance skill and dependency lock file. Signature of the manifest is a deployment responsibility outside this repository.
+The manifest records hashes of the hook, settings template, rendered production settings, compliance skill and dependency lock file. Signature of the manifest is a deployment responsibility outside this repository. Install the source compliance skill at `<managed-policy directory>/.claude/skills/ai-policy-compliance/SKILL.md`; on Linux this is `/etc/claude-code/.claude/skills/ai-policy-compliance/SKILL.md`.
 
 ## 4. Run manual release gates
 
-Run these on the certified platform path for the release candidate:
+Run these on the target container platform path after host acceptance for the release candidate:
 
 1. `claude doctor`, confirming managed settings are loaded.
 2. `/status` in a real session, confirming managed settings and hooks are in force.
-3. `CLAUDE_E2E=1 node tests/e2e.test.js` on a signed-in Claude Code installation.
-4. A real cross-matter refusal smoke test with the rendered settings.
+3. `CLAUDE_E2E=1 node tests/e2e.test.js` on a separate signed-in synthetic harness installation; its temporary hooks/settings do not validate installed managed controls.
+4. A real cross-matter refusal smoke test with the rendered settings, plus discovery and actual Skill invocation of the installed compliance skill without `--plugin-dir`.
 5. A sandbox availability check proving `sandbox.failIfUnavailable` refuses unprotected use.
 6. A `SessionEnd` transcript filing check, including one failure path observed by the external records service.
 7. Data-flow observation and owner sign-off under `docs/data-flow-model.md`.
@@ -83,7 +83,8 @@ The release owner records approval only after every automated gate, manual gate 
 ```text
 managed-settings.json
 hooks/matter-guard.js
-skills/ai-policy-compliance/SKILL.md
+.claude/skills/ai-policy-compliance/SKILL.md
+sandbox-policy.json
 release-manifest.json
 ```
 

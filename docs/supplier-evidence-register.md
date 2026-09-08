@@ -15,8 +15,8 @@ This register records the supplier facts asserted in the firm's AI policy and st
 |---|---|---|---|---|
 | Inputs and outputs are not used to train any model | REPLACE-WITH-ANTHROPIC-DATA-POLICY-URL | REPLACE-WITH-DATE | REPLACE-WITH-OWNER | REPLACE-WITH-DATE |
 | Inputs and outputs are not made publicly available | REPLACE-WITH-ANTHROPIC-DATA-POLICY-URL | REPLACE-WITH-DATE | REPLACE-WITH-OWNER | REPLACE-WITH-DATE |
-| Retention period does not exceed N days (firm's configured cleanup period) | REPLACE-WITH-ANTHROPIC-DATA-POLICY-URL | REPLACE-WITH-DATE | REPLACE-WITH-OWNER | REPLACE-WITH-DATE |
-| OTEL metrics and logs do not capture prompt or response content | REPLACE-WITH-ANTHROPIC-TELEMETRY-DOCS-URL | REPLACE-WITH-DATE | REPLACE-WITH-OWNER | REPLACE-WITH-DATE |
+| Supplier retention for the selected product/account is recorded separately from local cleanupPeriodDays | REPLACE-WITH-ANTHROPIC-DATA-POLICY-URL | REPLACE-WITH-DATE | REPLACE-WITH-OWNER | REPLACE-WITH-DATE |
+| Managed telemetry content gates are explicitly disabled and deployed collector output is observed | REPLACE-WITH-ANTHROPIC-TELEMETRY-DOCS-URL | REPLACE-WITH-DATE | REPLACE-WITH-OWNER | REPLACE-WITH-DATE |
 
 ## Notes
 

@@ -5,34 +5,92 @@
     "allowUnsandboxedCommands": false,
     "filesystem": {
       "allowManagedReadPathsOnly": true,
-      "denyRead": ["/", "~"],
-      "allowRead": ["/synthetic-matters/Smith", "/synthetic-matters/Jones", "/usr/bin", "/opt/claude"],
-      "allowWrite": ["/synthetic-matters/Smith", "/synthetic-matters/Jones", "/tmp/claude-session"]
+      "denyRead": [
+        "/",
+        "~"
+      ],
+      "allowRead": [
+        "/synthetic-matters/Smith",
+        "/usr/bin",
+        "/opt/claude"
+      ],
+      "allowWrite": [
+        "/synthetic-matters/Smith",
+        "/tmp/claude-session"
+      ]
     },
     "network": {
       "allowManagedDomainsOnly": true,
-      "allowedDomains": ["api.anthropic.com", "synthetic-otel.example.invalid"],
+      "allowedDomains": [
+        "api.anthropic.com",
+        "synthetic-otel.example.invalid"
+      ],
       "allowLocalBinding": false
     },
     "credentials": {
       "files": [
-        { "path": "~/.aws", "mode": "deny" },
-        { "path": "~/.ssh", "mode": "deny" },
-        { "path": "~/.config/gcloud", "mode": "deny" },
-        { "path": "~/.azure", "mode": "deny" },
-        { "path": "~/.kube", "mode": "deny" },
-        { "path": "~/.gnupg", "mode": "deny" },
-        { "path": "~/.netrc", "mode": "deny" },
-        { "path": "~/.git-credentials", "mode": "deny" },
-        { "path": "~/.npmrc", "mode": "deny" },
-        { "path": "~/.pypirc", "mode": "deny" }
+        {
+          "path": "~/.aws",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.ssh",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.config/gcloud",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.azure",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.kube",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.gnupg",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.netrc",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.git-credentials",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.npmrc",
+          "mode": "deny"
+        },
+        {
+          "path": "~/.pypirc",
+          "mode": "deny"
+        }
       ],
       "envVars": [
-        { "name": "GITHUB_TOKEN", "mode": "deny" },
-        { "name": "NPM_TOKEN", "mode": "deny" },
-        { "name": "AWS_ACCESS_KEY_ID", "mode": "deny" },
-        { "name": "AWS_SECRET_ACCESS_KEY", "mode": "deny" },
-        { "name": "ANTHROPIC_API_KEY", "mode": "deny" }
+        {
+          "name": "GITHUB_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "NPM_TOKEN",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_ACCESS_KEY_ID",
+          "mode": "deny"
+        },
+        {
+          "name": "AWS_SECRET_ACCESS_KEY",
+          "mode": "deny"
+        },
+        {
+          "name": "ANTHROPIC_API_KEY",
+          "mode": "deny"
+        }
       ]
     }
   }

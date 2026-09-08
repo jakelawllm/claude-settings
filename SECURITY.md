@@ -8,11 +8,11 @@ This is a beta reference implementation. It has not had independent security rev
 
 Read this before relying on any part of it.
 
-**The operating system sandbox is the boundary.** That is what contains a Bash command and its child processes. The template ships with `failIfUnavailable: false` for deployment observation periods. A production deployment MUST set this to true.
+**The accepted operating system/container environment is the boundary.** It must contain Bash and its child processes. The template ships with `failIfUnavailable: false` for synthetic observation only. Rendered deployment settings require true and a single-matter policy; host acceptance is still required.
 
-**The matter guard is not a boundary on its own.** `hooks/matter-guard.js` constrains the model, not a determined user. Its PreToolUse matcher is the wildcard `*`; a tool absent from the capability registry is refused in enforce mode rather than passed through. It does not parse shell commands, and the registry must be extended when new built-in, plugin or MCP tools are introduced, or those tools will be denied. On a machine without the sandbox it is advisory for those routes. Native Windows has no equivalent OS sandbox; the guard is advisory for Bash on that platform. Production deployments should use macOS, Linux, or Windows with Claude Code inside WSL2.
+**The matter guard is not a boundary on its own.** Its wildcard PreToolUse matcher denies unknown tools in enforce mode. It does not parse shell commands. New tools require deliberate registry classification. Native Windows has no equivalent OS sandbox and is unsupported for confidential-matter isolation. Linux containers, including inside WSL2, are supported deployment designs subject to host acceptance; macOS sandbox-alone is not certified. No repository test certifies a host.
 
-**Managed settings are a client-side control.** Anthropic's documentation is explicit that on an unmanaged device a user does not need administrator rights to bypass them. Deployment through MDM to a managed device is what makes them hold.
+**Managed settings are a client-side control.** Anthropic's documentation is explicit that on an unmanaged device a user does not need administrator rights to bypass them. Managed-device distribution helps control installation; accepted OS and launcher restrictions must also prevent alternate clients or processes bypassing that policy.
 
 **The MCP allowlist ships empty.** A `serverName` entry matches a display name chosen by whoever configures the server, so it does not identify one. Use an exact URL or command.
 
@@ -28,7 +28,7 @@ Please include the affected file and version, what an attacker or a careless use
 
 Only the current `main`. There are no tagged releases yet, and no backports.
 
-The configuration targets the Claude Code version in `requiredMinimumVersion`. Settings keys change between releases: a key that is renamed or removed is silently stripped from a managed file, so a configuration can stop enforcing something without any error. Re-check against the Claude Code settings documentation after upgrading, and treat `claude doctor` output as part of the upgrade.
+The declared range is `requiredMinimumVersion` through `requiredMaximumVersion`; it is not a claim that all versions were tested. Unknown or changed keys can stop enforcing policy. Re-check effective settings and the tool inventory against the client after upgrades, including `claude doctor`, `/status`, synthetic refusal/archival and host isolation acceptance.
 
 ## Known limitations carried deliberately
 
@@ -38,3 +38,13 @@ The configuration targets the Claude Code version in `requiredMinimumVersion`. S
 | Unknown-tool default-deny in enforce mode | The wildcard matcher and capability registry mean unknown tools are refused in enforce mode; the registry must be extended when new tools are added |
 | The WebFetch domain check sends the hostname to Anthropic | The setting that suppresses it also disables the malicious-domain blocklist, which is the worse trade |
 | Native Windows unsupported for matter isolation | No OS-level sandbox exists there |
+
+## Current internal review
+
+See [readiness](docs/INTERNAL_MVP_READINESS_REPORT.md) and [remaining issues](docs/INTERNAL_MVP_REMAINING_ISSUES.md). Use synthetic material in warn/off mode: it permits cross-matter operations and may archive the whole conversation under its first binding.
+
+Session state and archives must be inaccessible to other users. The hook refuses corrupt bindings, ambiguous roots, unresolved paths and unsafe archive destinations. It cannot eliminate filesystem replacement races between a hook check and the tool's later open; accepted OS isolation remains necessary.
+
+The optional GitHub Claude workflow is disabled by default, verifies repository write permission and has no OIDC grant under the static-token option. Its token rotation is external to this repository and is not required for the offline MVP checks.
+
+The full verification runner scans both Git history and pending changes with `scripts/scan-history.py --worktree`. Staged and unstaged changes are checked independently, so removing a staged credential only from the working copy cannot hide it. Git-listed nonignored new text files are included without entering ignored runtime directories or following symlink targets. The Office XML scanner also checks staged blobs independently and uses Git to select nonignored working files, without traversing private runtime caches. Detection remains heuristic; an exact reviewed public-digest exception is not a general secret exemption.

@@ -23,6 +23,9 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { createHash } = require('crypto');
+
+const { UTC_DAY, shiftedDate, dateFixture, copyEvidence } = require('./synthetic-evidence');
 
 const SCRIPT = path.join(__dirname, '..', 'scripts', 'preflight-validate.py');
 const REPO_ROOT = path.join(__dirname, '..');
@@ -35,36 +38,13 @@ const HOOK = 'node "${REPO_ROOT}/hooks/matter-guard.js"';
 const REGISTER_DIR = path.join(REPO_ROOT, 'test-fixtures', 'docs');
 
 function copyRegisters(destDir) {
-  const target = path.join(destDir, 'docs');
-  fs.mkdirSync(path.join(target, 'policy-decisions'), { recursive: true });
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'supplier-evidence-register.md'),
-    path.join(target, 'supplier-evidence-register.md')
-  );
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'policy-decisions', 'expert-report-rule.md'),
-    path.join(target, 'policy-decisions', 'expert-report-rule.md')
-  );
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'policy-decisions', 'oauth-token-management.md'),
-    path.join(target, 'policy-decisions', 'oauth-token-management.md')
-  );
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'legal-source-register.md'),
-    path.join(target, 'legal-source-register.md')
-  );
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'data-flow-model.md'),
-    path.join(target, 'data-flow-model.md')
-  );
-  fs.copyFileSync(
-    path.join(REGISTER_DIR, 'operational-evidence-register.md'),
-    path.join(target, 'operational-evidence-register.md')
-  );
+  if (!fs.existsSync(path.join(destDir, 'docs'))) copyEvidence(destDir);
 }
 
 function run(args, env) {
-  const r = spawnSync('python3', [SCRIPT, ...args], {
+  const settingFile = [...args].reverse().find(a => a.endsWith('.json'));
+  if (!args.includes('--evidence-root') && settingFile && fs.existsSync(path.join(path.dirname(settingFile), 'docs'))) args = [...args, '--evidence-root', path.dirname(settingFile)];
+  const r = spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), [SCRIPT, ...args], {
     encoding: 'utf8',
     env: env || process.env,
   });
@@ -80,6 +60,8 @@ function write(file, obj, withRegisters) {
   return p;
 }
 
+const productionExit = process.platform === 'linux' ? 0 : 1;
+const hostError = process.platform === 'win32' ? 'native Windows is not supported' : 'production requires a Linux/WSL2 target';
 let pass = 0;
 let fail = 0;
 
@@ -97,15 +79,17 @@ function prodBase() {
   return {
     $schema: 'https://json.schemastore.org/claude-code-settings.json',
     env: {
-      CLAUDE_CODE_ENABLE_TELEMETRY: '1',
+      CLAUDE_CODE_ENABLE_TELEMETRY: '1', CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1',
       OTEL_METRICS_EXPORTER: 'otlp',
       OTEL_LOGS_EXPORTER: 'otlp',
       OTEL_EXPORTER_OTLP_PROTOCOL: 'http/protobuf',
       OTEL_EXPORTER_OTLP_ENDPOINT: 'https://synthetic-otel.example.invalid:4318',
-      CLAUDE_MATTER_ROOTS: '/synthetic-matters/Smith;/synthetic-matters/Jones',
+      CLAUDE_MATTER_ROOTS: '/synthetic-matters',
       CLAUDE_MATTER_MODE: 'enforce',
+      OTEL_LOG_USER_PROMPTS: '0', OTEL_LOG_ASSISTANT_RESPONSES: '0',
+      OTEL_LOG_TOOL_DETAILS: '0', OTEL_LOG_TOOL_CONTENT: '0', OTEL_LOG_RAW_API_BODIES: '0',
     },
-    requiredMinimumVersion: '2.1.219',
+    requiredMinimumVersion: '2.1.251',
     requiredMaximumVersion: '2.1.300',
     forceLoginMethod: 'claudeai',
     forceLoginOrgUUID: '00000000-0000-4000-8000-000000000001',
@@ -115,6 +99,7 @@ function prodBase() {
     disableArtifact: true,
     disableRemoteControl: true,
     allowedMcpServers: [],
+    permissions: { deny: ['Bash(curl:*)'], defaultMode: 'default' },
     claudeMd: 'Synthetic-firm policy for all Claude Code use.',
     hooks: {
       PreToolUse: [
@@ -131,13 +116,15 @@ function prodBase() {
       ],
     },
     sandbox: {
+      credentials: JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'test-fixtures', 'synthetic-sandbox-policy.json'), 'utf8')).sandbox.credentials,
       enabled: true,
       failIfUnavailable: true,
       allowUnsandboxedCommands: false,
       filesystem: {
         allowManagedReadPathsOnly: true,
         denyRead: ['/', '~'],
-        allowRead: ['/synthetic-matters/Smith', '/synthetic-matters/Jones', '/usr/bin', '/opt/claude'],
+        allowRead: ['/synthetic-matters/Smith', '/usr/bin', '/opt/claude'],
+        allowWrite: ['/synthetic-matters/Smith', '/tmp/claude-session'],
       },
       network: {
         allowManagedDomainsOnly: true,
@@ -152,7 +139,7 @@ function prodBase() {
 // 01-05: template mode accepts placeholders
 const template = {
   env: {
-    CLAUDE_CODE_ENABLE_TELEMETRY: '1',
+    CLAUDE_CODE_ENABLE_TELEMETRY: '1', CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: '1',
     OTEL_EXPORTER_OTLP_ENDPOINT: 'REPLACE-WITH-YOUR-COLLECTOR-OR-DELETE-THESE-FIVE-KEYS',
     CLAUDE_MATTER_ROOTS: 'REPLACE-WITH-YOUR-MATTERS-ROOT-AND-EVERY-ALIAS-SEMICOLON-SEPARATED',
     CLAUDE_MATTER_MODE: 'warn',
@@ -228,9 +215,11 @@ check('18 production mode reports sandbox failIfUnavailable error', t16.stdout.i
 const prodGood = prodBase();
 const prodGoodPath = write('prod-good.json', prodGood, true);
 const t20 = run(['--mode', 'production', prodGoodPath]);
-check('20 production mode accepts valid production file', t20.code, 0);
-check('21 production mode reports PASS', t20.stdout.includes('PASS: production preconditions met'), true);
-check('22 production mode reports note', t20.stdout.includes('engineering readiness gate'), true);
+check('20 production config observes native Windows exclusion', t20.code, productionExit);
+check('21 valid production config reports expected host outcome', t20.stdout.includes(productionExit ? hostError : 'PASS: production preconditions met'), true);
+check('22 production mode reports note', t20.stdout.includes('engineering readiness gate'), productionExit === 0);
+
+check('valid production baseline has no unrelated errors', (t20.stdout.match(/^ERROR:/gm) || []).length, productionExit);
 
 // 23-24: production mode rejects missing managed controls
 const prodNoControls = prodBase();
@@ -314,7 +303,7 @@ prodNoDeny.sandbox.filesystem.denyRead = [];
 const prodNoDenyPath = write('prod-no-deny.json', prodNoDeny, true);
 const t42 = run(['--mode', 'production', prodNoDenyPath]);
 check('42 production mode rejects missing denyRead entry', t42.code, 1);
-check('43 production mode reports denyRead error', t42.stdout.includes("denyRead must include '/' or '~'"), true);
+check('43 production mode reports denyRead error', t42.stdout.includes("denyRead must include '/'"), true);
 
 // 44: production mode rejects allowManagedDomainsOnly with empty allowedDomains
 const prodNoDomains = prodBase();
@@ -393,7 +382,7 @@ const missingGateText = fs
   .split('\n')
   .filter((line) => !line.includes('Independent security review'))
   .join('\n');
-fs.writeFileSync(operationalMissingRegister, missingGateText);
+fs.writeFileSync(operationalMissingRegister, dateFixture(missingGateText));
 const t54 = run(['--mode', 'production', operationalMissingPath]);
 check('54 production mode rejects missing operational evidence gate', t54.code, 1);
 check(
@@ -410,9 +399,9 @@ function writeOauthDoc(dir, content) {
   fs.writeFileSync(target, content);
 }
 
-const OAUTH_DECISION_RECORD = `## Decision record
+const OAUTH_DECISION_RECORD = dateFixture(`## Decision record
 
-- Decision: Option B — synthetic static-token exception
+- Decision: Option B â€” synthetic static-token exception
 - Decided by: Synthetic Test Owner
 - Date: 2026-08-04
 - Rationale: Synthetic production validator fixture only.
@@ -425,7 +414,7 @@ const OAUTH_DECISION_RECORD = `## Decision record
 - Emergency revocation procedure: synthetic issuer revocation procedure
 - Monitoring owner: Synthetic Test Owner
 - Migration trigger: synthetic federation setup approved
-`;
+`);
 
 const OAUTH_COMPLETE_PROD = `# Policy decision: OAuth token management for Claude workflows
 
@@ -442,7 +431,7 @@ Status: APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE
 ${OAUTH_DECISION_RECORD}`;
 
 // 60: production mode rejects an internal-beta-only OAuth status even when
-// every operational field is filled — beta approval must never satisfy a
+// every operational field is filled â€” beta approval must never satisfy a
 // production gate.
 const prodOauthBeta = prodBase();
 const prodOauthBetaDir = path.join(TMP, 'oauth-beta');
@@ -451,7 +440,7 @@ writeOauthDoc(
   prodOauthBetaDir,
   OAUTH_COMPLETE_PROD.replace(
     'APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE',
-    'APPROVED FOR INTERNAL BETA ONLY — synthetic'
+    'APPROVED FOR INTERNAL BETA ONLY â€” synthetic'
   )
 );
 const t60 = run(['--mode', 'production', prodOauthBetaPath]);
@@ -474,7 +463,7 @@ writeOauthDoc(
   prodOauthNegativeDir,
   OAUTH_COMPLETE_PROD.replace(
     'APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE',
-    'NOT APPROVED — synthetic'
+    'NOT APPROVED â€” synthetic'
   )
 );
 const t62 = run(['--mode', 'production', prodOauthNegativePath]);
@@ -529,7 +518,7 @@ check(
 );
 
 // 68: template mode still accepts the repository's real internal-beta-only
-// OAuth decision — beta scope is a warning gate, not a hard failure, until
+// OAuth decision â€” beta scope is a warning gate, not a hard failure, until
 // production mode is requested.
 const t68 = run(['--mode', 'template', path.join(REPO_ROOT, 'managed-settings.json')]);
 check('68 template mode still passes with internal-beta OAuth status', t68.code, 0);
@@ -544,7 +533,7 @@ const prodOauthDirectStatusPath = write(
 );
 writeOauthDoc(prodOauthDirectStatusDir, OAUTH_COMPLETE_PROD_STATUS_LINE);
 const t69 = run(['--mode', 'production', prodOauthDirectStatusPath]);
-check('69 production mode accepts direct OAuth Status line', t69.code, 0);
+check('69 production mode accepts direct OAuth Status line', t69.code, productionExit);
 
 // 70: direct "Status: NOT APPROVED" must still fail under the normalised parser.
 const prodOauthDirectNegative = prodBase();
@@ -558,7 +547,7 @@ writeOauthDoc(
   prodOauthDirectNegativeDir,
   OAUTH_COMPLETE_PROD_STATUS_LINE.replace(
     'APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE',
-    'NOT APPROVED — synthetic'
+    'NOT APPROVED â€” synthetic'
   )
 );
 const t70 = run(['--mode', 'production', prodOauthDirectNegativePath]);
@@ -581,7 +570,7 @@ writeOauthDoc(
   prodOauthDirectBetaDir,
   OAUTH_COMPLETE_PROD_STATUS_LINE.replace(
     'APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE',
-    'APPROVED FOR INTERNAL BETA ONLY — synthetic'
+    'APPROVED FOR INTERNAL BETA ONLY â€” synthetic'
   )
 );
 const t72 = run(['--mode', 'production', prodOauthDirectBetaPath]);
@@ -611,7 +600,7 @@ Status: APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE
 ${OAUTH_DECISION_RECORD}`
 );
 const t74 = run(['--mode', 'production', prodOauthHeadingDirectPath]);
-check('74 production mode accepts Status under ## Status heading', t74.code, 0);
+check('74 production mode accepts Status under ## Status heading', t74.code, productionExit);
 
 // 75: expert-report direct "Status: NOT APPROVED" must fail the anchored check.
 function writeExpertDoc(dir, content) {
@@ -631,7 +620,7 @@ writeExpertDoc(
   prodExpertNegativeDir,
   `# Policy decision: expert-report rule
 
-Status: NOT APPROVED — synthetic
+Status: NOT APPROVED â€” synthetic
 
 ## Decision
 
@@ -659,7 +648,7 @@ check('82 quiet flag suppresses production note', !tQuietProduction.stdout.inclu
 
 // 83: production mode reports a note without quiet
 const tProductionNote = run(['--mode', 'production', prodGoodPath]);
-check('83 production mode reports note without quiet', tProductionNote.stdout.includes('engineering readiness gate'), true);
+check('83 production mode reports note without quiet', tProductionNote.stdout.includes('engineering readiness gate'), productionExit === 0);
 
 // ---- committed template / synthetic fixture ---------------------------------
 
@@ -672,10 +661,13 @@ const tCommittedProduction = run(['--mode', 'production', path.join(REPO_ROOT, '
 check('85 committed template fails production mode', tCommittedProduction.code, 1);
 
 // 86: committed synthetic-production.json passes production mode
+const relativeEvidenceRoot = path.join(TMP, 'current-synthetic-evidence');
+copyEvidence(relativeEvidenceRoot);
 const tSyntheticProduction = run([
   '--mode', 'production', path.join(REPO_ROOT, 'test-fixtures', 'synthetic-production.json'),
+  '--evidence-root', relativeEvidenceRoot,
 ]);
-check('86 synthetic fixture passes production mode', tSyntheticProduction.code, 0);
+check('86 synthetic fixture passes production mode', tSyntheticProduction.code, productionExit);
 
 // 87: mutation test rejects an invalid non-placeholder root
 const prodBadRoot = prodBase();
@@ -686,6 +678,173 @@ check('87 production mode rejects invalid root', tBadRoot.code, 1);
 check('88 production mode reports invalid root', tBadRoot.stdout.includes('CLAUDE_MATTER_ROOTS root is not an absolute POSIX path'), true);
 
 // ---- cleanup ----------------------------------------------------------------
+for (const [label, mutate, expected] of [
+  ['filtered matcher', d => { d.hooks.PreToolUse[0].matcher = 'Read'; }, 'must match all events'],
+  ['async hook', d => { d.hooks.PreToolUse[0].hooks[0].async = true; }, 'synchronous command hook'],
+  ['all hooks disabled', d => { d.disableAllHooks = true; }, 'disableAllHooks must be false'],
+  ['wrong interpreter', d => { d.hooks.PreToolUse[0].hooks[0].command = HOOK.replace('node', 'echo'); }, 'does not invoke matter-guard.js'],
+  ['malformed hook list', d => { d.hooks.PreToolUse[0].hooks = 42; }, 'non-empty array'],
+  ['hook shell expansion', d => { d.hooks.PreToolUse[0].hooks[0].command = 'node "/tmp/$(touch injected)/matter-guard.js"'; }, 'does not invoke matter-guard.js'],
+  ['non-object document', () => [], 'settings must be a JSON object'],
+  ['nested placeholder', d => { d.permissions.deny.push('Read(REPLACE-WITH-PATH)'); }, 'unresolved REPLACE-WITH placeholder at settings.permissions.deny'],
+  ['filesystem root', d => { d.env.CLAUDE_MATTER_ROOTS = '/'; }, 'not an absolute POSIX path'],
+  ['global read', d => { d.sandbox.filesystem.allowRead.push('/'); }, 'allowRead must be a non-empty array'],
+  ['sibling read', d => { d.sandbox.filesystem.allowRead.push('/synthetic-matters/Jones'); }, 'sandbox allowRead exposes a parent or sibling'],
+  ['two writable matters', d => { d.sandbox.filesystem.allowWrite.push('/synthetic-matters/Jones'); }, 'exactly one matter'],
+  ['wrong guard root', d => { d.env.CLAUDE_MATTER_ROOTS = '/synthetic-matters/Smith'; }, 'immediate child'],
+  ['home-only denial', d => { d.sandbox.filesystem.denyRead = ['~']; }, "denying '~' alone"],
+  ['filesystem isolation disabled', d => { d.sandbox.filesystem.disabled = true; }, 'filesystem.disabled must be false'],
+  ['subprocess credential scrub missing', d => { delete d.env.CLAUDE_CODE_SUBPROCESS_ENV_SCRUB; }, 'CLAUDE_CODE_SUBPROCESS_ENV_SCRUB must be'],
+  ['wildcard domain', d => { d.sandbox.network.allowedDomains = ['*']; }, 'exact hostnames'],
+  ['Unix sockets bypass', d => { d.sandbox.network.allowAllUnixSockets = true; }, 'Unix socket access must be disabled'],
+  ['missing credentials', d => { delete d.sandbox.credentials; }, 'credentials.files must contain deny entries'],
+  ['credential allow', d => { d.sandbox.credentials.files[0].mode = 'allow'; }, 'credentials.files must contain deny entries'],
+  ['content logging inherited', d => { delete d.env.OTEL_LOG_TOOL_CONTENT; }, 'OTEL_LOG_TOOL_CONTENT must explicitly'],
+  ['old telemetry bypass version', d => { d.requiredMinimumVersion = '2.1.250'; }, 'must be at least 2.1.251'],
+  ['version trailing junk', d => { d.requiredMaximumVersion = '2.1.300junk'; }, 'not a valid version'],
+  ['inverted versions', d => { d.requiredMinimumVersion = '2.1.301'; }, 'exceeds requiredMaximumVersion'],
+  ['empty HTTPS host', d => { d.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'https://'; }, 'must start with https://'],
+  ['OTLP query', d => { d.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'https://collector.example.invalid?synthetic=1'; }, 'must start with https://'],
+  ['OTLP signal endpoint', d => { d.env.OTEL_EXPORTER_OTLP_ENDPOINT = 'https://collector.example.invalid/v1/traces'; }, 'must start with https://'],
+]) {
+  const fixture = prodBase();
+  const returned = mutate(fixture);
+  const candidatePath = write(`adversarial/${label}.json`, returned === undefined ? fixture : returned, true);
+  const result = run(['--mode', 'production', candidatePath]);
+  check(`${label} rejected`, result.code, 1);
+  check(`${label} identified specifically`, result.stdout.includes(expected), true);
+  check(`${label} does not crash`, result.stderr.includes('Traceback'), false);
+}
+// Evidence must be deliberately selected, not picked up next to an artefact.
+const implicitEvidence = spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'),
+  [SCRIPT, '--mode', 'production', prodGoodPath], { encoding: 'utf8' });
+check('adjacent synthetic evidence cannot shadow repository registers', implicitEvidence.stdout.includes('governance register unresolved'), true);
+const badDatePath = write('bad-date/settings.json', prodBase(), true);
+const badDateRegister = path.join(TMP, 'bad-date/docs/operational-evidence-register.md');
+fs.writeFileSync(badDateRegister, fs.readFileSync(badDateRegister, 'utf8').replace(shiftedDate(-1), '2026-02-30'));
+const badDate = run(['--mode', 'production', badDatePath]);
+check('impossible evidence date is rejected', badDate.stdout.includes('date is not an ISO date'), true);
+for (const [register, removed, expected] of [
+  ['supplier-evidence-register.md', 'Inputs and outputs are not used to train any model', 'supplier evidence register must contain exactly one entry'],
+  ['legal-source-register.md', 'Federal Court general practice note', 'legal source register must contain exactly one entry'],
+]) {
+  const candidate = write(`removed-${register}/settings.json`, prodBase(), true);
+  const registerPath = path.join(path.dirname(candidate), 'docs', register);
+  fs.writeFileSync(registerPath, fs.readFileSync(registerPath, 'utf8').split('\n').filter(line => !line.includes(removed)).join('\n'));
+  check(`deleted ${register} gate rejected`, run(['--mode', 'production', candidate]).stdout.includes(expected), true);
+}
+const byteFailure = path.join(TMP, 'invalid-utf8.json');
+fs.writeFileSync(byteFailure, Buffer.from([0xff, 0xfe, 0xff]));
+const invalidUtf8 = run(['--mode', 'template', byteFailure]);
+check('invalid UTF-8 fails usefully', invalidUtf8.code === 1 && invalidUtf8.stdout.includes('ERROR:') && !invalidUtf8.stderr.includes('Traceback'), true);
+// Exercise currency/ordering through the CLI, whose clock always uses UTC now.
+for (const [label, register, change, expected] of [
+  ['supplier review expired', 'supplier-evidence-register.md', text => text.replace(shiftedDate(364), shiftedDate(-2)), 'review is overdue'],
+  ['legal review expired', 'legal-source-register.md', text => text.replace(shiftedDate(364), shiftedDate(-2)), 'review is overdue'],
+  ['supplier future verification', 'supplier-evidence-register.md', text => text.replace(shiftedDate(-1), shiftedDate(7)), 'completed date is in the future'],
+  ['legal future verification', 'legal-source-register.md', text => text.replace(shiftedDate(-1), shiftedDate(7)), 'completed date is in the future'],
+  ['supplier reverse review dates', 'supplier-evidence-register.md', text => text.replace(shiftedDate(-1), shiftedDate(3)).replace(shiftedDate(364), shiftedDate(2)), 'due date precedes its completed date'],
+  ['legal reverse review dates', 'legal-source-register.md', text => text.replace(shiftedDate(-1), shiftedDate(3)).replace(shiftedDate(364), shiftedDate(2)), 'due date precedes its completed date'],
+  ['token rotation overdue', 'policy-decisions/oauth-token-management.md', text => text.replace(shiftedDate(89), shiftedDate(-2)), 'rotation is overdue'],
+  ['token future rotation', 'policy-decisions/oauth-token-management.md', text => text.replace(`Last rotated: ${shiftedDate(-1)}`, `Last rotated: ${shiftedDate(7)}`), 'rotation completed date is in the future'],
+  ['token future approval', 'policy-decisions/oauth-token-management.md', text => text.replace(`Date: ${shiftedDate(-1)}`, `Date: ${shiftedDate(7)}`), 'approval date is in the future'],
+  ['token reverse rotation dates', 'policy-decisions/oauth-token-management.md', text => text.replace(`Last rotated: ${shiftedDate(-1)}`, `Last rotated: ${shiftedDate(3)}`).replace(shiftedDate(89), shiftedDate(2)), 'rotation due date precedes its completed date'],
+  ['future operational observation', 'operational-evidence-register.md', text => text.replace(shiftedDate(-1), shiftedDate(7)), 'date is in the future'],
+  ['future data-flow signoff', 'data-flow-model.md', text => text.replace(shiftedDate(-1), shiftedDate(7)), 'date is in the future'],
+  ['missing legal interpretation', 'legal-source-register.md', text => text.replace('Synthetic interpretation for tests.', ''), 'approved interpretation is unresolved'],
+  ['unapproved legal interpretation', 'legal-source-register.md', text => text.replace('Synthetic interpretation for tests.', 'NOT APPROVED'), 'approved interpretation is unresolved'],
+  ['placeholder supplier source URL', 'supplier-evidence-register.md', text => text.replace('https://docs.anthropic.com/en/legal/ai-data-policy', 'https://REPLACE-WITH-SOURCE'), 'source URL is not http(s)'],
+  ['empty supplier source host', 'supplier-evidence-register.md', text => text.replace('https://docs.anthropic.com/en/legal/ai-data-policy', 'https://'), 'source URL is not http(s)'],
+]) {
+  const fixture = write(`currency-${label}/settings.json`, prodBase(), true);
+  const evidence = path.join(path.dirname(fixture), 'docs', register);
+  fs.writeFileSync(evidence, change(fs.readFileSync(evidence, 'utf8')));
+  const result = run(['--mode', 'production', fixture]);
+  check(`${label} rejected`, result.code, 1);
+  check(`${label} identified`, result.stdout.includes(expected), true);
+}
+// Disabling an optional integration needs a positive, current observation;
+// absent secrets or variables never replace the active credential gate.
+const workflowDigest = createHash('sha256').update(fs.readFileSync(path.join(REPO_ROOT,
+  '.github/workflows/claude.yml'), 'utf8').replace(/\r\n/g, '\n')).digest('hex');
+const workflowOrigin = spawnSync('git', ['config', '--get', 'remote.origin.url'],
+  { cwd: REPO_ROOT, encoding: 'utf8' }).stdout.trim();
+const workflowRepository = workflowOrigin.replace(/^(?:https:\/\/github\.com\/|git@github\.com:|ssh:\/\/git@github\.com\/)/, '').replace(/\.git$/, '');
+const disabledObservation = `### Current workflow disposition
+
+Status: DISABLED
+
+- Workflow state: disabled_manually
+- Workflow path: .github/workflows/claude.yml
+- Workflow ID: 322652643
+- Repository: ${workflowRepository}
+- Workflow SHA-256 (LF): ${workflowDigest}
+- Evidence source: https://api.github.com/repos/${workflowRepository}/actions/workflows/claude.yml
+- Observed by: Synthetic test observer
+- Verified date: ${UTC_DAY}
+
+### Refresh before release
+
+Historical text below this boundary must not supply missing current fields.
+`;
+function disabledResult(label, observation) {
+  const fixture = write(`workflow-${label}/settings.json`, prodBase(), true);
+  writeOauthDoc(path.dirname(fixture), `# OAuth history\n\nStatus: APPROVED FOR INTERNAL BETA ONLY\n\n- Last rotated: never rotated\n- Next rotation due: 2020-01-01\n\n${observation}`);
+  return run(['--mode', 'production', fixture]);
+}
+const disabledGood = disabledResult('current', disabledObservation);
+check('current explicit disabled workflow releases optional token gate', disabledGood.code, productionExit);
+check('disabled workflow has no unrelated errors', (disabledGood.stdout.match(/^ERROR:/gm) || []).length, productionExit);
+for (const [label, change, expected] of [
+  ['active state', t => t.replace('Workflow state: disabled_manually', 'Workflow state: active'), 'observed disabled_manually state'],
+  ['wrong path', t => t.replace('Workflow path: .github/workflows/claude.yml', 'Workflow path: .github/workflows/ci.yml'), 'workflow path must be'],
+  ['wrong ID', t => t.replace('Workflow ID: 322652643', 'Workflow ID: not-a-number'), 'ID must be a positive integer'],
+  ['wrong repository', t => t.replace(`Repository: ${workflowRepository}`, 'Repository: synthetic/unrelated'), 'does not match this checkout'],
+  ['wrong source', t => t.replace('Evidence source: https://api.github.com/', 'Evidence source: https://unrelated.example.invalid/'), 'must identify this workflow'],
+  ['stale hash', t => t.replace(workflowDigest, '0'.repeat(64)), 'hash does not match'],
+  ['old observation', t => t.replace(`Verified date: ${UTC_DAY}`, `Verified date: ${shiftedDate(-1)}`), 'current UTC assessment date'],
+  ['future observation', t => t.replace(`Verified date: ${UTC_DAY}`, `Verified date: ${shiftedDate(7)}`), 'current UTC assessment date'],
+  ['missing observer', t => t.replace('- Observed by: Synthetic test observer\n', ''), "field 'Observed by' is unresolved"],
+  ['blank observer', t => t.replace('Observed by: Synthetic test observer', 'Observed by:'), "field 'Observed by' is unresolved"],
+  ['placeholder source', t => t.replace('Observed by: Synthetic test observer', 'Observed by: PENDING'), "field 'Observed by' is unresolved"],
+  ['duplicate field', t => t.replace('- Workflow state: disabled_manually', '- Workflow state: disabled_manually\n- Workflow state: active'), "field 'Workflow state' is unresolved"],
+  ['missing status', t => t.replace('Status: DISABLED', ''), 'has no status line'],
+  ['duplicate section', t => t + t, 'current workflow disposition is duplicated'],
+]) {
+  const result = disabledResult(label, change(disabledObservation));
+  check(`disabled ${label} rejected`, result.code, 1);
+  check(`disabled ${label} identified`, result.stdout.includes(expected), true);
+}
+const activeCurrent = disabledResult('active approved', `### Current workflow disposition\n\nStatus: APPROVED FOR SYNTHETIC PRODUCTION TEST FIXTURE\n\n${OAUTH_DECISION_RECORD.replace('## Decision record', '#### Decision record')}`);
+check('current approved credentials still support active workflow', (activeCurrent.stdout.match(/^ERROR:/gm) || []).length, productionExit);
+const boldCurrent = disabledResult('bold labels', disabledObservation.replace(/^- ([^:\n]+): /gm, '- **$1:** '));
+check('standard bold decision fields parse without bypass', (boldCurrent.stdout.match(/^ERROR:/gm) || []).length, productionExit);
+// Pin the clock internally for deterministic boundary tests; there is no CLI
+// clock override that could make an expired production approval look current.
+const dateBoundaries = spawnSync(process.env.PYTHON || (process.platform === 'win32' ? 'python' : 'python3'), ['-c', `
+import datetime as dt, importlib.util, pathlib, sys
+script = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(script.parent))
+spec = importlib.util.spec_from_file_location('preflight', script)
+preflight = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(preflight)
+as_of = dt.date(2040, 2, 29)
+assert not preflight._review_date_issues('2040-02-28', '2040-02-29', 'review', as_of)
+assert not preflight._review_date_issues('2040-02-29', '2040-03-01', 'review', as_of)
+assert any('overdue' in issue for issue in preflight._review_date_issues('2040-02-27', '2040-02-28', 'review', as_of))
+assert any('future' in issue for issue in preflight._review_date_issues('2040-03-01', '2040-03-02', 'review', as_of))
+assert any('precedes' in issue for issue in preflight._review_date_issues('2040-03-02', '2040-03-01', 'review', as_of))
+fixtures = script.parent.parent / 'test-fixtures' / 'docs'
+supplier = (fixtures / 'supplier-evidence-register.md').read_text(encoding='utf-8')
+assert not preflight._validate_supplier_evidence_register(supplier, dt.date(2026, 9, 7))
+assert any('overdue' in issue for issue in preflight._validate_supplier_evidence_register(supplier, dt.date(2028, 1, 1)))
+legal = (fixtures / 'legal-source-register.md').read_text(encoding='utf-8')
+assert any('future' in issue for issue in preflight._validate_legal_source_register(legal, dt.date(2026, 8, 3)))
+oauth = (fixtures / 'policy-decisions' / 'oauth-token-management.md').read_text(encoding='utf-8')
+assert not preflight._validate_oauth_token_management(oauth, 'production', dt.date(2026, 11, 2))
+assert any('overdue' in issue for issue in preflight._validate_oauth_token_management(oauth, 'production', dt.date(2026, 11, 3)))
+`, SCRIPT], { encoding: 'utf8' });
+check('UTC expiry boundaries and leap dates are deterministic', dateBoundaries.status, 0);
 fs.rmSync(TMP, { recursive: true, force: true });
 
 console.log(`\npassed=${pass} failed=${fail}`);

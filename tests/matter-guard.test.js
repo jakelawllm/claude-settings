@@ -15,7 +15,7 @@
 
 'use strict';
 
-const { spawnSync } = require('child_process');
+const { spawnSync, spawn } = require('child_process');
 const { createHash } = require('crypto');
 const fs = require('fs');
 const os = require('os');
@@ -42,6 +42,11 @@ fs.writeFileSync(path.join(JONES, 'b.txt'), 'b');
 
 let pass = 0;
 let fail = 0;
+let skip = 0;
+function skipped(label, count = 1) {
+  skip += count;
+  console.log('SKIP  ' + label);
+}
 function check(label, got, want) {
   const ok = got === want;
   ok ? pass++ : fail++;
@@ -57,6 +62,7 @@ function baseEnv(over) {
     CLAUDE_MATTER_MODE: 'enforce',
     CLAUDE_MATTER_STATE_DIR: STATE,
     CLAUDE_RECORD_ROOT: '',
+    CLAUDE_MATTER_ARCHIVE: '_ai-record',
     ...over,
   };
 }
@@ -66,12 +72,12 @@ function call(ev, env, rawInput) {
     input: rawInput !== undefined ? rawInput : JSON.stringify(ev),
     encoding: 'utf8',
     env: env || baseEnv(),
+    timeout: 10000,
   });
-  try {
-    return JSON.parse(r.stdout);
-  } catch {
-    return {};
-  }
+  if (r.error) throw r.error;
+  if (r.status === 2) return { hookSpecificOutput: { permissionDecision: 'deny' } };
+  if (r.status !== 0) throw new Error(`Hook crashed with exit ${r.status}: ${r.stderr}`);
+  return r.stdout.trim() ? JSON.parse(r.stdout) : {};
 }
 
 const decision = (o) =>
@@ -92,6 +98,8 @@ function pre(session, tool, target, cwd, env, rawInput) {
 }
 
 const freshState = () => fs.rmSync(STATE, { recursive: true, force: true });
+
+async function main() {
 
 // -- separation ------------------------------------------------------------
 
@@ -126,7 +134,7 @@ if (aliasMade) {
   check('10 same matter via second alias', decision(pre('s3', 'Read', path.join(ALIAS, 'Smith', 'a.txt'), SMITH, env)), 'allow');
   check('11 other matter via second alias', decision(pre('s3', 'Read', path.join(ALIAS, 'Jones', 'b.txt'), SMITH, env)), 'deny');
 } else {
-  console.log('SKIP  10-11 alias cases (link creation unavailable)');
+  skipped('10-11 alias cases (link creation unavailable)', 2);
 }
 
 // Regression (H-01): a path lexically inside the bound matter that links out.
@@ -142,7 +150,7 @@ if (linkMade) {
   pre('s4', 'Read', path.join(SMITH, 'a.txt'), SMITH);
   check('12 symlink out of bound matter', decision(pre('s4', 'Read', path.join(ESCAPE, 'b.txt'), SMITH)), 'deny');
 } else {
-  console.log('SKIP  12 symlink escape (link creation unavailable)');
+  skipped('12 symlink escape (link creation unavailable)');
 }
 
 // -- ancestor matrix (SEC-04 / design §6.3) ----------------------------------
@@ -191,47 +199,40 @@ if (linkMade) {
   check('41 record root must not dilute ancestor refusal', decision(pre('m7', 'Read', path.join(SMITH_A, 'a.txt'), PARENT, centralEnv)), 'deny');
 }
 
-// -- concurrency (TST-01 / SEC-03) -------------------------------------------
-// Two hook processes aimed at different matters, released simultaneously, must
-// produce at most one winner. The first write wins via exclusive create.
+// -- actual concurrent first-touch integration ------------------------------
+// Launch separate hook processes, wait until both are spawned, then release
+// their complete stdin events together. No timing seam exists in production.
 {
   freshState();
-  const A = SMITH, B = JONES;
-  const aTarget = path.join(A, 'a.txt');
-  const bTarget = path.join(B, 'b.txt');
-  const mkEv = (session, tool, target, cwd) => JSON.stringify({
-    hook_event_name: 'PreToolUse', session_id: session, tool_name: tool,
-    tool_input: { file_path: target }, cwd,
-  });
-  // Same session_id, two different matters: exclusive-create means at most one
-  // binding can win. Sequential is not a full race, but it still proves the
-  // second first-touch cannot rebind after the first exclusive create.
-  const r1 = spawnSync(process.execPath, [HOOK], {
-    input: mkEv('c-race', 'Read', aTarget, A),
-    env: baseEnv(),
-    encoding: 'utf8',
-  });
-  const r2 = spawnSync(process.execPath, [HOOK], {
-    input: mkEv('c-race', 'Read', bTarget, B),
-    env: baseEnv(),
-    encoding: 'utf8',
-  });
-  const d1 = (() => {
-    try {
-      return JSON.parse(r1.stdout).hookSpecificOutput.permissionDecision || 'allow';
-    } catch {
-      return 'allow';
-    }
-  })();
-  const d2 = (() => {
-    try {
-      return JSON.parse(r2.stdout).hookSpecificOutput.permissionDecision || 'allow';
-    } catch {
-      return 'allow';
-    }
-  })();
-  const pattern = d1 === 'allow' && d2 === 'deny' ? 'first-wins' : d1 === 'deny' && d2 === 'allow' ? 'second-wins' : `${d1}+${d2}`;
-  check('42 same-session first-touch binds once (exclusive create)', pattern, 'first-wins');
+  for (let round = 0; round < 8; round++) {
+    const session = 'race-' + round;
+    const children = [SMITH, JONES].map((cwd) => {
+      const child = spawn(process.execPath, [HOOK], { env: baseEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
+      const ready = new Promise((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); });
+      const result = new Promise((resolve, reject) => {
+        let stdout = '', stderr = '';
+        const timeout = setTimeout(() => { child.kill(); reject(new Error('concurrent hook timed out')); }, 10000);
+        child.stdout.on('data', (data) => { stdout += data; });
+        child.stderr.on('data', (data) => { stderr += data; });
+        child.once('error', reject);
+        child.once('close', (code) => {
+          clearTimeout(timeout);
+          if (code !== 0 && code !== 2) return reject(new Error(`concurrent hook exited ${code}: ${stderr}`));
+          try { resolve(code === 2 ? 'deny' : decision(stdout ? JSON.parse(stdout) : {})); } catch (error) { reject(error); }
+        });
+      });
+      return { child, ready, result, cwd };
+    });
+    await Promise.all(children.map((c) => c.ready));
+    for (const { child, cwd } of children) child.stdin.end(JSON.stringify({
+      hook_event_name: 'PreToolUse', session_id: session, cwd, tool_name: 'Read',
+      tool_input: { file_path: path.join(cwd, cwd === SMITH ? 'a.txt' : 'b.txt') },
+    }));
+    const results = await Promise.all(children.map((c) => c.result));
+    check(`42 concurrent first touch round ${round + 1}: one winner`, results.filter((d) => d === 'allow').length, 1);
+    const saved = JSON.parse(fs.readFileSync(path.join(STATE, stateFileFor(session)), 'utf8'));
+    check(`42 concurrent round ${round + 1}: persisted winner`, saved.name.toLowerCase(), results[0] === 'allow' ? 'smith' : 'jones');
+  }
 }
 
 // -- configuration faults: every one fails closed in enforce ---------------
@@ -418,6 +419,154 @@ check(
   );
 }
 
+// -- additional internal-MVP regressions ------------------------------------
+
+freshState();
+check('relative same-matter Read anchors to event cwd', decision(pre('relative', 'Read', 'a.txt', SMITH)), 'allow');
+check('relative parent traversal refuses sibling', decision(pre('relative', 'Read', '../Jones/b.txt', SMITH)), 'deny');
+check('LSP filePath is checked', decision(pre('relative', 'LSP', null, SMITH, undefined, { filePath: path.join(JONES, 'b.txt'), operation: 'hover' })), 'deny');
+check('Glob parent pattern refuses sibling', decision(pre('relative', 'Glob', null, SMITH, undefined, { path: SMITH, pattern: '../Jones/**' })), 'deny');
+check('Glob absolute pattern refuses sibling', decision(pre('relative', 'Glob', null, SMITH, undefined, { path: SMITH, pattern: JONES + '/**' })), 'deny');
+check('Glob brace alternative cannot name absolute sibling', decision(pre('relative', 'Glob', null, SMITH, undefined, { path: SMITH, pattern: '{*.txt,' + JONES + '/**}' })), 'deny');
+check('Glob escaped dots cannot name parent', decision(pre('relative', 'Glob', null, SMITH, undefined, { path: SMITH, pattern: '\\.\\./Jones/**' })), 'deny');
+check('Glob normal relative pattern allows', decision(pre('relative', 'Glob', null, SMITH, undefined, { pattern: '**/*.txt' })), 'allow');
+check('nonexistent same-matter write allows', decision(pre('relative', 'Write', path.join(SMITH, 'new', 'deep', 'file.txt'), SMITH)), 'allow');
+for (const target of ['', 123, null, 'a\0b', 'x'.repeat(33000)]) {
+  check('malformed or unresolvable tool target refuses', decision(pre('bad-target', 'Read', target, SMITH)), 'deny');
+}
+check('non-directory ancestor refuses', decision(pre('bad-target', 'Write', path.join(SMITH, 'a.txt', 'child'), SMITH)), 'deny');
+check('missing required target refuses', decision(pre('bad-target', 'Read', null, SMITH, undefined, {})), 'deny');
+check('missing cwd refuses', decision(pre('bad-target', 'Read', path.join(SMITH, 'a.txt'), undefined)), 'deny');
+check('relative cwd refuses', decision(pre('bad-target', 'Read', path.join(SMITH, 'a.txt'), 'Smith')), 'deny');
+check('nonexistent cwd refuses', decision(pre('bad-target', 'Read', path.join(SMITH, 'a.txt'), path.join(SMITH, 'absent'))), 'deny');
+check('missing session id refuses', decision(pre(undefined, 'Read', path.join(SMITH, 'a.txt'), SMITH)), 'deny');
+check('inherited registry name is unknown', decision(pre('proto', 'constructor', null, SMITH)), 'deny');
+freshState();
+check('mixed first touch refuses before committing binding', decision(pre('mixed-first', 'Read', path.join(JONES, 'b.txt'), SMITH)), 'deny');
+check('denied first touch leaves no binding', fs.existsSync(path.join(STATE, stateFileFor('mixed-first'))), false);
+check('invalid enforcement mode refuses', decision(pre('mode', 'Read', path.join(SMITH, 'a.txt'), SMITH, baseEnv({ CLAUDE_MATTER_MODE: 'enforc' }))), 'deny');
+// Inject only fd-1 failures, through a Node preload, to exercise the actual
+// child-process hook contract without a production-only testing branch.
+const outputFault = path.join(TMP, 'output-fault.cjs');
+fs.writeFileSync(outputFault, "const fs = require('fs'); const write = fs.writeSync; fs.writeSync = (fd, ...args) => { if (fd === 1) throw new Error('synthetic stdout failure'); return write(fd, ...args); };\n");
+const faultEvent = JSON.stringify({ hook_event_name: 'PreToolUse', session_id: 'stdout', tool_name: 'UnknownTool', tool_input: {}, cwd: SMITH });
+const outputFailed = spawnSync(process.execPath, ['--require', outputFault, HOOK], { input: faultEvent, env: baseEnv(), encoding: 'utf8', timeout: 10000 });
+check('unwritable stdout uses blocking exit code 2', outputFailed.status, 2);
+fs.writeFileSync(outputFault, "const fs = require('fs'); const write = fs.writeSync; fs.writeSync = (fd, buffer, offset, length, ...rest) => write(fd, buffer, offset, fd === 1 && Buffer.isBuffer(buffer) ? Math.min(length, 7) : length, ...rest);\n");
+const partialOutput = spawnSync(process.execPath, ['--require', outputFault, HOOK], { input: faultEvent, env: baseEnv(), encoding: 'utf8', timeout: 10000 });
+check('partial stdout writes still publish complete refusal JSON', partialOutput.status === 0 && decision(JSON.parse(partialOutput.stdout)), 'deny');
+check('relative archive root refuses', decision(pre('config', 'Read', path.join(SMITH, 'a.txt'), SMITH, baseEnv({ CLAUDE_RECORD_ROOT: 'archive' }))), 'deny');
+check('archive subfolder traversal refuses', decision(pre('config', 'Read', path.join(SMITH, 'a.txt'), SMITH, baseEnv({ CLAUDE_MATTER_ARCHIVE: '../Jones' }))), 'deny');
+check('file configured as matter root refuses', decision(pre('config', 'Read', path.join(SMITH, 'a.txt'), SMITH, baseEnv({ CLAUDE_MATTER_ROOTS: path.join(SMITH, 'a.txt') }))), 'deny');
+const existingPlaceholder = path.join(TMP, 'REPLACE-WITH-MATTERS');
+fs.mkdirSync(existingPlaceholder);
+check('existing placeholder root is still rejected', decision(pre('config', 'Read', path.join(SMITH, 'a.txt'), SMITH, baseEnv({ CLAUDE_MATTER_ROOTS: existingPlaceholder }))), 'deny');
+check('nested matter roots refuse', decision(pre('config', 'Read', path.join(SMITH, 'a.txt'), SMITH, baseEnv({ CLAUDE_MATTER_ROOTS: MATTERS + ';' + SMITH }))), 'deny');
+check('state within matter root refuses', decision(pre('config', 'Read', path.join(SMITH, 'a.txt'), SMITH, baseEnv({ CLAUDE_MATTER_STATE_DIR: path.join(SMITH, 'state') }))), 'deny');
+check('tool cannot overwrite binding state', decision(pre('relative', 'Write', path.join(STATE, stateFileFor('relative')), SMITH)), 'deny');
+
+freshState();
+pre('observe', 'Read', path.join(SMITH, 'a.txt'), SMITH, WARN);
+for (const tool of ['PowerShell', 'NewPluginTool']) {
+  const result = pre('observe', tool, null, SMITH, WARN);
+  check('warn allows ' + tool, decision(result), 'allow');
+  check('warn reports ' + tool, Boolean(result.systemMessage), true);
+}
+check('warn allows ancestor traversal', decision(pre('observe', 'Glob', MATTERS, SMITH, WARN)), 'allow');
+const audit = fs.readFileSync(path.join(STATE, 'would-have-blocked.log'), 'utf8').trim().split('\n').map(JSON.parse);
+check('warn audit records all three refusals', audit.length, 3);
+check('warn audit uses timestamp and full session hash', audit.every((entry) => Number.isFinite(Date.parse(entry.timestamp)) && /^[a-f0-9]{64}$/.test(entry.session)), true);
+for (const event of ['SessionStart', 'SessionEnd']) {
+  check('off is silent on ' + event, Object.keys(call({ hook_event_name: event, session_id: 'off', cwd: SMITH, transcript_path: transcript }, baseEnv({ CLAUDE_MATTER_MODE: 'off' }))).length, 0);
+}
+
+// Archives must preserve bytes, identity, privacy and existing files.
+const end = (session, env, source = transcript) => call({ hook_event_name: 'SessionEnd', session_id: session, cwd: SMITH, transcript_path: source }, env);
+const filesUnder = (dir) => fs.existsSync(dir) ? fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => entry.isDirectory() ? filesUnder(path.join(dir, entry.name)) : [path.join(dir, entry.name)]) : [];
+const sessionFiles = (session, root = SMITH) => filesUnder(root).filter((file) => file.endsWith(stateFileFor(session).replace(/\.json$/, '.jsonl')));
+freshState();
+// Whole seconds avoid filesystem timestamp-rounding differences on retries.
+const archiveTime = new Date('2026-01-02T03:04:05.000Z');
+fs.utimesSync(transcript, archiveTime, archiveTime);
+const startResult = call({ hook_event_name: 'SessionStart', session_id: 'prompt-only', cwd: SMITH });
+check('SessionStart binds prompt-only sessions', /smith/i.test(startResult.hookSpecificOutput.additionalContext), true);
+check('prompt-only archive reports success', end('prompt-only').systemMessage.includes('Session record filed'), true);
+check('archive bytes match complete source', fs.readFileSync(sessionFiles('prompt-only')[0], 'utf8'), fs.readFileSync(transcript, 'utf8'));
+const firstArchive = sessionFiles('prompt-only')[0];
+check('idempotent SessionEnd retry succeeds', end('prompt-only').systemMessage.includes('Session record filed'), true);
+check('idempotent retry creates one archive', sessionFiles('prompt-only').length, 1);
+const archiveBytes = fs.readFileSync(firstArchive, 'utf8');
+const sourceStat = fs.statSync(transcript);
+fs.writeFileSync(transcript, '{"x":2}\n');
+fs.utimesSync(transcript, sourceStat.atime, sourceStat.mtime);
+check('changed transcript with same destination refuses overwrite', end('prompt-only').systemMessage.includes('could NOT'), true);
+check('existing archive preserved after collision', fs.readFileSync(firstArchive, 'utf8'), archiveBytes);
+check('failed archive cleans staging files', filesUnder(SMITH).some((file) => file.endsWith('.part')), false);
+for (const session of ['sameprefix-one', 'sameprefix-two', '../x/y/../hostile']) {
+  pre(session, 'Read', path.join(SMITH, 'a.txt'), SMITH);
+  check('raw session cannot collide/traverse archive filename', end(session).systemMessage.includes('Session record filed'), true);
+  check('archive uses full session hash only', sessionFiles(session).length, 1);
+}
+check('missing transcript reports a records gap', end('sameprefix-one', undefined, path.join(TMP, 'missing.jsonl')).systemMessage.includes('could NOT'), true);
+check('missing transcript path reports a records gap', call({ hook_event_name: 'SessionEnd', session_id: 'sameprefix-one', cwd: SMITH }).systemMessage.includes('could NOT'), true);
+check('missing binding reports a records gap', end('never-bound').systemMessage.includes('could NOT'), true);
+pre('tampered', 'Read', path.join(SMITH, 'a.txt'), SMITH);
+const tampered = JSON.parse(fs.readFileSync(path.join(STATE, stateFileFor('tampered')), 'utf8'));
+tampered.dir = JONES;
+fs.writeFileSync(path.join(STATE, stateFileFor('tampered')), JSON.stringify(tampered));
+check('inconsistent binding refuses tools', decision(pre('tampered', 'Read', path.join(SMITH, 'a.txt'), SMITH)), 'deny');
+check('inconsistent binding refuses archival', end('tampered').systemMessage.includes('could NOT'), true);
+
+freshState();
+const CENTRAL2 = path.join(TMP, 'new-central');
+const secondRoot = path.join(TMP, 'other-root');
+const secondSmith = path.join(secondRoot, 'Smith');
+fs.mkdirSync(secondSmith, { recursive: true });
+fs.writeFileSync(path.join(secondSmith, 'a.txt'), 'second matter');
+const env2 = baseEnv({ CLAUDE_RECORD_ROOT: CENTRAL2, CLAUDE_MATTER_ROOTS: MATTERS + ';' + secondRoot });
+pre('central-one', 'Read', path.join(SMITH, 'a.txt'), SMITH, env2);
+pre('central-two', 'Read', path.join(secondSmith, 'a.txt'), secondSmith, env2);
+end('central-one', env2);
+end('central-two', env2);
+const ownArchive = sessionFiles('central-one', CENTRAL2)[0];
+const otherArchive = sessionFiles('central-two', CENTRAL2)[0];
+check('distinct roots use distinct central matter buckets', fs.readdirSync(CENTRAL2).length, 2);
+check('own central archive is readable', decision(pre('central-one', 'Read', ownArchive, SMITH, env2)), 'allow');
+check('same-name other-root archive is denied', decision(pre('central-one', 'Read', otherArchive, SMITH, env2)), 'deny');
+check('central archive root is denied', decision(pre('central-one', 'Glob', CENTRAL2, SMITH, env2)), 'deny');
+check('central archive ancestor is denied', decision(pre('central-one', 'Grep', TMP, SMITH, env2)), 'deny');
+check('central hash bucket without matter is denied', decision(pre('central-one', 'Glob', path.dirname(path.dirname(ownArchive)), SMITH, env2)), 'deny');
+const nestedEnv = baseEnv({ CLAUDE_RECORD_ROOT: path.join(MATTERS, 'central-archive') });
+check('central archive immediate child of matters supports same matter', decision(pre('nested-central', 'Read', path.join(SMITH, 'a.txt'), SMITH, nestedEnv)), 'allow');
+end('nested-central', nestedEnv);
+check('nested central archive files normally', sessionFiles('nested-central', path.join(MATTERS, 'central-archive')).length, 1);
+
+if (linkMade) {
+  const archivedLink = path.join(SMITH, 'linked-archive');
+  fs.symlinkSync(JONES, archivedLink, LINK_TYPE);
+  const linkEnv = baseEnv({ CLAUDE_MATTER_ARCHIVE: 'linked-archive' });
+  pre('archive-link', 'Read', path.join(SMITH, 'a.txt'), SMITH, linkEnv);
+  check('archive symlink escape reports failure', end('archive-link', linkEnv).systemMessage.includes('could NOT'), true);
+  check('archive symlink never files into other matter', sessionFiles('archive-link', JONES).length, 0);
+  const dangling = path.join(SMITH, 'dangling');
+  fs.symlinkSync(path.join(TMP, 'absent-target'), dangling, LINK_TYPE);
+  check('dangling link is resolution failure', decision(pre('link', 'Write', path.join(dangling, 'new.txt'), SMITH)), 'deny');
+  if (process.platform !== 'win32') {
+    // POSIX resolves a symlink before processing a following parent segment.
+    const outside = path.join(TMP, 'elsewhere', 'child');
+    fs.mkdirSync(outside, { recursive: true });
+    fs.symlinkSync(SMITH, path.join(TMP, 'elsewhere', 'reentry'), 'dir');
+    fs.symlinkSync(outside, path.join(JONES, 'out'), 'dir');
+    check('symlink then parent follows actual filesystem semantics', decision(pre('symlink-parent', 'Read', JONES + '/out/../reentry/a.txt', JONES)), 'deny');
+  } else skipped('POSIX symlink followed by parent resolution (Windows resolves parent segments differently)');
+} else {
+  skipped('archive symlink escape, dangling link and symlink-parent tests (links unavailable)', 4);
+}
+if (process.platform !== 'win32') {
+  check('archive directory is private', (fs.statSync(path.dirname(firstArchive)).mode & 0o777).toString(8), '700');
+  check('archive file is private', (fs.statSync(firstArchive).mode & 0o777).toString(8), '600');
+} else skipped('archive POSIX permission bits (Windows uses ACLs)', 2);
+
 // -- state hygiene (H-03) --------------------------------------------------
 
 if (process.platform !== 'win32') {
@@ -426,9 +575,16 @@ if (process.platform !== 'win32') {
   check('28 state directory is private', (fs.statSync(STATE).mode & 0o777).toString(8), '700');
   check('29 state file is private', (fs.statSync(path.join(STATE, stateFileFor('p1'))).mode & 0o777).toString(8), '600');
 } else {
-  console.log('SKIP  28-29 POSIX permission bits (Windows uses ACLs)');
+  skipped('28-29 POSIX permission bits (Windows uses ACLs)', 2);
 }
 
-console.log(`\npassed=${pass} failed=${fail}`);
+console.log(`\npassed=${pass} failed=${fail} skipped=${skip}`);
 fs.rmSync(TMP, { recursive: true, force: true });
 process.exit(fail ? 1 : 0);
+}
+
+main().catch((error) => {
+  console.error(error);
+  fs.rmSync(TMP, { recursive: true, force: true });
+  process.exit(1);
+});

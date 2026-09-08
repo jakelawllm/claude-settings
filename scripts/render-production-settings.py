@@ -4,7 +4,7 @@
         --firm-name "Example Legal" \
         --org-uuid 11111111-2222-3333-4444-555555555555 \
         --matter-roots "/srv/matters;/Volumes/matters" \
-        --otel-endpoint "https://collector.internal/v1/traces" \
+        --otel-endpoint "https://collector.internal" \
         --sandbox-policy dist/sandbox-policy.json
 
 The checked-in `managed-settings.json` is a template: it carries
@@ -43,8 +43,12 @@ import argparse
 import json
 import os
 import pathlib
+import shlex
 import sys
 from typing import Any
+from release_validation import (UUID_RE, VERSION_RE, CONTENT_LOG_KEYS, atomic_write_json, hook_script,
+                                valid_posix_path, valid_https_endpoint,
+                                validate_sandbox, validate_matter_scope, version_tuple)
 
 SCRIPT_DIR = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent
@@ -85,7 +89,7 @@ def rewrite_hook_commands(hooks: dict, hook_path: str) -> None:
                     continue
                 command = hook.get("command")
                 if isinstance(command, str) and "matter-guard.js" in command:
-                    hook["command"] = f'node "{hook_path}"'
+                    hook["command"] = "node " + shlex.quote(hook_path)
 
 
 def find_remaining_placeholders(obj, path="") -> list:
@@ -107,7 +111,7 @@ def load_json(path: pathlib.Path, label: str) -> tuple[dict[str, Any] | None, st
         return None, f"{label} not found ({path})"
     try:
         payload = json.loads(path.read_text(encoding="utf8"))
-    except json.JSONDecodeError as exc:
+    except (json.JSONDecodeError, UnicodeError, OSError) as exc:
         return None, f"{label} is not valid JSON: {exc}"
     if not isinstance(payload, dict):
         return None, f"{label} must be a JSON object"
@@ -117,34 +121,9 @@ def load_json(path: pathlib.Path, label: str) -> tuple[dict[str, Any] | None, st
 def extract_sandbox_policy(policy: dict[str, Any]) -> tuple[dict[str, Any] | None, list[str]]:
     """Return a sandbox object from either {sandbox:{...}} or a sandbox object."""
     sandbox = policy.get("sandbox") if "sandbox" in policy else policy
-    errors = []
-    if not isinstance(sandbox, dict):
-        return None, ["sandbox policy must contain a sandbox object"]
-    if sandbox.get("enabled") is not True:
-        errors.append("sandbox policy must set sandbox.enabled true")
-    if sandbox.get("failIfUnavailable") is not True:
-        errors.append("sandbox policy must set sandbox.failIfUnavailable true")
-    if sandbox.get("allowUnsandboxedCommands") is not False:
-        errors.append("sandbox policy must set sandbox.allowUnsandboxedCommands false")
-    fs = sandbox.get("filesystem")
-    if not isinstance(fs, dict):
-        errors.append("sandbox policy must contain sandbox.filesystem")
-    else:
-        if fs.get("allowManagedReadPathsOnly") is not True:
-            errors.append("sandbox policy must set sandbox.filesystem.allowManagedReadPathsOnly true")
-        deny_read = fs.get("denyRead") or []
-        if not isinstance(deny_read, list) or not any(d in ("/", "~") for d in deny_read):
-            errors.append("sandbox policy filesystem.denyRead must include '/' or '~'")
-    net = sandbox.get("network")
-    if not isinstance(net, dict):
-        errors.append("sandbox policy must contain sandbox.network")
-    else:
-        if net.get("allowManagedDomainsOnly") is not True:
-            errors.append("sandbox policy must set sandbox.network.allowManagedDomainsOnly true")
-        allowed_domains = net.get("allowedDomains") or []
-        if not isinstance(allowed_domains, list) or not allowed_domains:
-            errors.append("sandbox policy network.allowedDomains must be a non-empty array")
-    return sandbox, errors
+    errors = validate_sandbox(sandbox)
+    return sandbox if isinstance(sandbox, dict) else None, errors
+
 
 
 def merge_sandbox_policy(settings: dict[str, Any], sandbox_policy: dict[str, Any]) -> None:
@@ -170,12 +149,41 @@ def validate_template_controls(settings: dict[str, Any]) -> list[str]:
     for key, message in REQUIRED_TEMPLATE_KEYS.items():
         if key not in settings:
             errors.append(f"template missing required key '{key}': {message}")
+        elif key.startswith(("allowManaged", "forceRemote", "disable")) and settings[key] is not True:
+            errors.append(message)
+    if settings.get("allowedMcpServers") != []:
+        errors.append("template allowedMcpServers must be an empty array")
+    for key in ("requiredMinimumVersion", "requiredMaximumVersion"):
+        if not isinstance(settings.get(key), str) or not VERSION_RE.fullmatch(settings[key]):
+            errors.append(f"template {key} must be a complete numeric version")
+    minimum, maximum = settings.get("requiredMinimumVersion"), settings.get("requiredMaximumVersion")
+    if isinstance(minimum, str) and isinstance(maximum, str) and VERSION_RE.fullmatch(minimum) and VERSION_RE.fullmatch(maximum):
+        if version_tuple(minimum) > version_tuple(maximum):
+            errors.append("template minimum version exceeds maximum version")
+        if version_tuple(minimum) < (2, 1, 251):
+            errors.append("template minimum version must be at least 2.1.251 for managed telemetry protection")
+    if not isinstance(settings.get("env"), dict):
+        errors.append("template env must be an object")
+    else:
+        if settings["env"].get("CLAUDE_CODE_SUBPROCESS_ENV_SCRUB") != "1":
+            errors.append("template CLAUDE_CODE_SUBPROCESS_ENV_SCRUB must be '1'")
+        for key in CONTENT_LOG_KEYS:
+            if settings["env"].get(key) != "0":
+                errors.append(f"template {key} must explicitly be '0'")
+        if any(not isinstance(value, str) for value in settings["env"].values()):
+            errors.append("template env values must be strings")
+    if not isinstance(settings.get("sandbox"), dict):
+        errors.append("template sandbox must be an object")
     # Also assert the permissions deny block exists
     permissions = settings.get("permissions")
     if not isinstance(permissions, dict):
         errors.append("template missing permissions block")
     elif "deny" not in permissions:
         errors.append("template missing permissions.deny block")
+    elif not isinstance(permissions["deny"], list) or not permissions["deny"] or not all(isinstance(rule, str) and rule for rule in permissions["deny"]):
+        errors.append("template permissions.deny must be a non-empty array of rules")
+    if isinstance(permissions, dict) and permissions.get("defaultMode") in ("bypassPermissions", "dontAsk"):
+        errors.append("template must not bypass permission prompts")
     return errors
 
 
@@ -191,6 +199,9 @@ def render(
     disable_telemetry: bool,
     force: bool,
 ) -> int:
+    if output_path.resolve() in [p.resolve() for p in (template_path, sandbox_policy_path) if p is not None]:
+        print("ERROR: output must not overwrite a template or sandbox policy input")
+        return 1
     settings, template_error = load_json(template_path, "template")
     if template_error:
         print(f"ERROR: {template_error}")
@@ -208,10 +219,12 @@ def render(
         return 1
 
     errors = []
-    if not firm_name:
+    if not firm_name.strip():
         errors.append("firm name is required (--firm-name or CLAUDE_FIRM_NAME)")
     if not org_uuid:
         errors.append("org UUID is required (--org-uuid or CLAUDE_ORG_UUID)")
+    elif not UUID_RE.fullmatch(org_uuid):
+        errors.append("org UUID is not a valid UUID")
     if not matter_roots:
         errors.append("matter roots are required (--matter-roots or CLAUDE_MATTER_ROOTS)")
     if not sandbox_policy_path:
@@ -237,8 +250,12 @@ def render(
     if matter_roots:
         for root in matter_roots.split(";"):
             root = root.strip()
-            if root and not pathlib.PurePath(root).is_absolute():
-                errors.append(f"matter root is not an absolute path: {root!r}")
+            if not valid_posix_path(root):
+                errors.append("matter root is not an absolute path: expected a literal POSIX path excluding root")
+    if not valid_posix_path(hook_path) or pathlib.PurePosixPath(hook_path).name != "matter-guard.js":
+        errors.append("hook path must be a literal absolute POSIX path ending in matter-guard.js")
+    if not disable_telemetry and otel_endpoint and not valid_https_endpoint(otel_endpoint):
+        errors.append("telemetry endpoint must be an HTTPS base URL without credentials, query, fragment or /v1/traces, /v1/logs, /v1/metrics suffix")
 
     sandbox_policy = None
     if sandbox_policy_path:
@@ -249,6 +266,8 @@ def render(
             assert raw_policy is not None
             sandbox_policy, sandbox_errors = extract_sandbox_policy(raw_policy)
             errors.extend(sandbox_errors)
+            if sandbox_policy is not None and not sandbox_errors:
+                errors.extend(validate_matter_scope(sandbox_policy, [r.strip() for r in matter_roots.split(";") if r.strip()]))
 
     if errors:
         for e in errors:
@@ -278,6 +297,24 @@ def render(
 
     hooks = settings.get("hooks")
     if isinstance(hooks, dict):
+        for event in ("PreToolUse", "SessionStart", "SessionEnd"):
+            entries = hooks.get(event)
+            if not isinstance(entries, list) or not entries:
+                errors.append(f"template missing hook event: {event}")
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict) or not isinstance(entry.get("hooks"), list) or not entry["hooks"]:
+                    errors.append(f"template hook {event} must contain a non-empty hooks array")
+                    continue
+                if (event == "PreToolUse" and entry.get("matcher") != "*") or (event != "PreToolUse" and entry.get("matcher", "*") not in ("*", "")):
+                    errors.append(f"template hook {event} must match all events")
+                for hook in entry["hooks"]:
+                    if not isinstance(hook, dict) or hook.get("type") != "command" or hook.get("async", False) is not False or hook.get("asyncRewake", False) is not False or hook_script(hook.get("command")) is None:
+                        errors.append(f"template hook {event} must synchronously invoke matter-guard.js with node")
+        if errors:
+            for error in errors:
+                print(f"ERROR: {error}")
+            return 1
         rewrite_hook_commands(hooks, hook_path)
     else:
         print("ERROR: template has no hooks block: the matter guard is not wired up")
@@ -302,18 +339,11 @@ def render(
         print("FAIL: 1 error(s) found")
         return 1
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    # newline='\n' keeps the file LF on Windows, matching the rest of the repo.
-    with open(output_path, "w", encoding="utf8", newline="\n") as fh:
-        json.dump(settings, fh, indent=2, ensure_ascii=False)
-        fh.write("\n")
-
-    # The file carries the practice's own deployment values. Keep it off other
-    # accounts on a shared machine.
     try:
-        os.chmod(output_path, 0o600)
-    except OSError as exc:
-        print(f"WARNING: could not set {output_path} permissions to 0600: {exc}")
+        atomic_write_json(output_path, settings, overwrite=force)
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: could not write output atomically: {exc}")
+        return 1
 
     print(f"wrote {output_path}")
     if disable_telemetry:
@@ -375,7 +405,7 @@ def main(argv=None) -> int:
 
     return render(
         template_path=pathlib.Path(args.template).resolve(),
-        output_path=pathlib.Path(args.output).resolve(),
+        output_path=pathlib.Path(args.output).absolute(),
         firm_name=resolve(args.firm_name, "CLAUDE_FIRM_NAME"),
         org_uuid=resolve(args.org_uuid, "CLAUDE_ORG_UUID"),
         matter_roots=resolve(args.matter_roots, "CLAUDE_MATTER_ROOTS"),

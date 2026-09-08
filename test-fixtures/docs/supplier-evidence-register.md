@@ -15,8 +15,8 @@ This register records the supplier facts asserted in the firm's AI policy and st
 |---|---|---|---|---|
 | Inputs and outputs are not used to train any model | https://docs.anthropic.com/en/legal/ai-data-policy | 2026-08-04 | SYNTHETIC-FIXTURE | 2027-08-04 |
 | Inputs and outputs are not made publicly available | https://docs.anthropic.com/en/legal/ai-data-policy | 2026-08-04 | SYNTHETIC-FIXTURE | 2027-08-04 |
-| Retention period does not exceed N days (firm's configured cleanup period) | https://docs.anthropic.com/en/legal/ai-data-policy | 2026-08-04 | SYNTHETIC-FIXTURE | 2027-08-04 |
-| OTEL metrics and logs do not capture prompt or response content | https://docs.anthropic.com/en/legal/ai-data-policy | 2026-08-04 | SYNTHETIC-FIXTURE | 2027-08-04 |
+| Supplier retention for the selected product/account is recorded separately from local cleanupPeriodDays | https://docs.anthropic.com/en/legal/ai-data-policy | 2026-08-04 | SYNTHETIC-FIXTURE | 2027-08-04 |
+| Managed telemetry content gates are explicitly disabled and deployed collector output is observed | https://docs.anthropic.com/en/legal/ai-data-policy | 2026-08-04 | SYNTHETIC-FIXTURE | 2027-08-04 |
 
 ## Notes
 

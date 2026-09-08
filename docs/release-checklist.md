@@ -20,7 +20,7 @@ A release candidate should have these artefacts:
 - the tracked source tree at the release tag;
 - a rendered managed settings file for the deploying practice, usually `dist/managed-settings.production.json`;
 - the managed hook at the platform path referenced by that rendered file;
-- the `skills/ai-policy-compliance/` directory installed beside the managed settings file;
+- repository source `skills/ai-policy-compliance/` installed under `.claude/skills/ai-policy-compliance/` inside the managed-policy directory;
 - recorded output from the validation commands below;
 - a rollback copy of the previous known-good managed-policy bundle;
 - a release manifest (`dist/release-manifest.json`) containing hashes of all critical artefacts, signed by the deployment process outside this repository.
@@ -60,7 +60,7 @@ python3 scripts/generate-matter-sandbox.py \
   --matter-definition dist/matter-definition.json \
   --output dist/sandbox-policy.json
 
-python3 scripts/generate-release-manifest.py \
+python3 scripts/generate-release-manifest.py --claude-code-version "<actual tested version>" \
   --output dist/release-manifest.json \
   --production-settings dist/managed-settings.production.json \
   --sandbox-policy dist/sandbox-policy.json
@@ -109,7 +109,7 @@ python3 scripts/render-production-settings.py \
   --firm-name "<practice name>" \
   --org-uuid "<Claude org UUID>" \
   --matter-roots "<absolute matter root>[;<alias>]" \
-  --otel-endpoint "https://<collector>/v1/traces" \
+  --otel-endpoint "https://<collector>" \
   --sandbox-policy dist/sandbox-policy.json
 
 python3 scripts/preflight-validate.py --mode production dist/managed-settings.production.json
@@ -118,15 +118,15 @@ python3 scripts/preflight-validate.py --mode production dist/managed-settings.pr
 Generate and verify the release manifest:
 
 ```bash
-python3 scripts/generate-release-manifest.py \
+python3 scripts/generate-release-manifest.py --claude-code-version "<actual tested version>" \
   --output dist/release-manifest.json \
   --production-settings dist/managed-settings.production.json \
   --sandbox-policy dist/sandbox-policy.json
 
-# If the working tree is dirty and the deployment process deliberately accepts that state:
+# Development evidence only: --allow-dirty must never label a deployable release.
 #   python3 scripts/generate-release-manifest.py --allow-dirty ...
 
-python3 scripts/generate-release-manifest.py \
+python3 scripts/generate-release-manifest.py --claude-code-version "<actual tested version>" \
   --verify \
   --output dist/release-manifest.json \
   --production-settings dist/managed-settings.production.json \
@@ -137,10 +137,10 @@ If the practice deliberately disables telemetry, record the reason and render wi
 
 ## Version compatibility process (CFG-07)
 
-The template and rendered production settings must record a certified version range:
+The template and rendered production settings must record a declared version range (requires client acceptance):
 
 ```json
-"requiredMinimumVersion": "2.1.219",
+"requiredMinimumVersion": "2.1.251",
 "requiredMaximumVersion": "2.1.300"
 ```
 
@@ -228,7 +228,7 @@ These names close only the ownership-identity item on the tag gate. They do not 
 The repository can prepare the evidence framework, but cannot close these gates without a responsible human owner. On 2026-08-12 the responsible principal (**jacobcd123**) resolved or waived each gate for an **internal beta only**. These dispositions do **not** authorise a production go for external or client use.
 
 - [x] Expert-report policy decision recorded in `docs/policy-decisions/expert-report-rule.md` and aligned across the DOCX, generated Markdown, managed instruction and compliance skill. **RESOLVED — Option A (strict prohibition), 2026-08-12**, decided by jacobcd123. Rationale: simplicity and lowest risk for beta. Clause 7.3, `claudeMd` and the compliance skill now state the same absolute ban.
-- [x] OAuth token management decision recorded in `docs/policy-decisions/oauth-token-management.md`; no long-lived token without approved exception and rotation plan. **Option B (static-token exception for internal beta) — operational fields complete, 2026-08-14**, decided by jacobcd123, because this repository has not completed or approved the documented direct Anthropic Workload Identity Federation setup. Owner packet now fully filled: token owner jacobcd123; storage GitHub Actions secret `CLAUDE_CODE_OAUTH_TOKEN` (name only); minimum static-token permissions are read-only (`contents`/`pull-requests`/`issues`/`actions`, `@claude` trigger only); current workflow also grants unused `id-token: write`, which is not minimum and remains unchanged for this decision; rotation interval 90 days; last rotated never; next rotation due immediately on 2026-08-14 (rotate on or before this date); emergency revocation procedure requires immediate workflow disablement, issuer-side token revocation and confirmation, GitHub-secret replacement or deletion, replacement-token-only testing, then workflow re-enablement; monitoring owner jacobcd123; migration trigger completion and approval of Anthropic Workload Identity Federation (issuer, service account, federation rule, repository-restricted claims). **SUP-05 exception complete for internal beta only.** Production go for external/client use still blocked by other gates and the README beta disclaimer.
+- [x] OAuth token management decision recorded in `docs/policy-decisions/oauth-token-management.md`; no long-lived token without approved exception and rotation plan. **Option B (static-token exception for internal beta) — operational fields complete, 2026-08-14**, decided by jacobcd123, because this repository has not completed or approved the documented direct Anthropic Workload Identity Federation setup. Owner packet now fully filled: token owner jacobcd123; storage GitHub Actions secret `CLAUDE_CODE_OAUTH_TOKEN` (name only); minimum static-token permissions are read-only (`contents`/`pull-requests`/`issues`/`actions`, `@claude` trigger only); the workflow at that date also granted unused `id-token: write` (removed in the 2026-09-07 remediation); rotation interval 90 days; last rotated never; next rotation due immediately on 2026-08-14 (rotate on or before this date); emergency revocation procedure requires immediate workflow disablement, issuer-side token revocation and confirmation, GitHub-secret replacement or deletion, replacement-token-only testing, then workflow re-enablement; monitoring owner jacobcd123; migration trigger completion and approval of Anthropic Workload Identity Federation (issuer, service account, federation rule, repository-restricted claims). **SUP-05 exception complete for internal beta only.** Production go for external/client use still blocked by other gates and the README beta disclaimer.
 - [ ] Supplier evidence register completed with source URLs, owner names, checked dates and next-review dates. **Waived for internal beta only** by jacobcd123, 2026-08-12. Register cells remain unfilled; not a production go for external/client use.
 - [ ] Legal source register completed against authorised primary sources. **Waived for internal beta only** by jacobcd123, 2026-08-12. Register cells remain unfilled; not a production go for external/client use.
 - [ ] Data-flow model observed and approved by privacy, security and records owners. **Waived for internal beta only** by jacobcd123, 2026-08-12. Sign-off cells remain unfilled; not a production go for external/client use.
@@ -243,7 +243,7 @@ The repository can prepare the evidence framework, but cannot close these gates 
 - [ ] Template preflight mode passes against `managed-settings.json`.
 - [ ] Production preflight mode passes against the rendered settings file.
 - [ ] Release manifest is generated and verified.
-- [ ] Live E2E has passed on a signed-in Claude Code installation. **Blocked on a Windows host** — candidate path `Z:` is not usable on this Linux checkout; re-run on the Windows host with `CLAUDE_MATTER_ROOTS` set to a real matter root. **Waived for internal beta only** by jacobcd123, 2026-08-12 (does not clear the production-go requirement). Record the production completion reference in `docs/operational-evidence-register.md`.
+- [ ] Live E2E has passed on a signed-in Claude Code installation. **Historical 2026-08-12 blockage, superseded:** the current harness creates synthetic roots and does not use a mapped drive. See the current readiness report for executed results; installed host acceptance remains separate. **Waived for internal beta only** by jacobcd123, 2026-08-12 (does not clear the production-go requirement). Record the production completion reference in `docs/operational-evidence-register.md`.
 - [ ] OS sandbox availability and fail-closed behaviour have been checked in the target environment. **Waived for internal beta only** by jacobcd123, 2026-08-12 (does not clear the production-go requirement). Record the production completion reference in `docs/operational-evidence-register.md`.
 - [ ] The hook installed path matches the command in the rendered settings file.
 - [ ] Transcript filing has been checked. Record the production completion reference in `docs/operational-evidence-register.md`.
@@ -263,16 +263,18 @@ macOS         /Library/Application Support/ClaudeCode/managed-settings.json
 Linux, WSL    /etc/claude-code/managed-settings.json
 ```
 
-Install the hook and skill beside it:
+Install the hook and skill at these paths relative to the managed-policy directory:
 
 ```text
 <system directory>/hooks/matter-guard.js
-<system directory>/skills/ai-policy-compliance/SKILL.md
+<system directory>/.claude/skills/ai-policy-compliance/SKILL.md
 ```
+
+On Linux, the managed skill must be `/etc/claude-code/.claude/skills/ai-policy-compliance/SKILL.md`. Confirm it appears in `/skills` and observe an actual Skill invocation from that installed source; a plugin loaded with `--plugin-dir` does not verify this installation. See [Claude managed skill locations](https://code.claude.com/docs/en/skills#remove-a-skill).
 
 The hook command in the rendered settings file is literal JSON. It must match the installed path for the platform. A Linux path in a macOS deployment is a broken guard, not a portability feature.
 
-Native Windows is not a production hard-isolation target for confidential Bash use. Use Windows with Claude Code inside WSL2 if the boundary needs to hold.
+Native Windows is not a production hard-isolation target for confidential Bash use. Use WSL2 running the accepted Linux container path; WSL2 alone is not an accepted boundary.
 
 ## Rollback
 
@@ -281,7 +283,8 @@ Before rollout, keep a copy of the previous known-good managed-policy bundle:
 ```text
 managed-settings.json
 hooks/matter-guard.js
-skills/ai-policy-compliance/SKILL.md
+.claude/skills/ai-policy-compliance/SKILL.md
+sandbox-policy.json
 release-manifest.json
 ```
 
@@ -301,3 +304,17 @@ Rollback verification succeeds only when a new session loads the previous settin
 ## Remaining caveats
 
 A release tag proves only that these repository gates passed at that revision. It does not prove that a practice has satisfied its professional obligations, that the operating system sandbox actually worked on every target machine, or that the deployment remains correct after Claude Code settings change. Re-check after every Claude Code upgrade and before adding any built-in, plugin or MCP tool surface.
+
+## 2026-09-07 review addendum
+
+This checklist was inherited from main at e25608d975ef58d31bd4ff7984eabb0622046b22. Historical 2026-08 decisions and waivers above are retained. Current evidence and dispositions are in [the internal-MVP report](INTERNAL_MVP_READINESS_REPORT.md); unresolved work is in [remaining issues](INTERNAL_MVP_REMAINING_ISSUES.md). No new human waiver or certification is inferred from this review.
+
+Run python scripts/verify.py for the complete offline suite, including new converter/E2E-oracle tests, syntax, schema, parity, clause, link, scanner and bundle checks. Live harness success proves hook integration, not installed managed policy or OS isolation. The evidence registers still require real deployment observations. The optional OAuth workflow is disabled until explicitly enabled and its overdue rotation is resolved.
+
+The manifest JSON example above is descriptive, not a published schema endpoint. The generator validates all hash fields, dates, tree state, declared range and explicitly supplied tested client version; use --claude-code-version with the actual tested version for both generation and verification.
+
+## 2026-09-08 current delegated internal-MVP decision
+
+The owner subsequently authorised Codex to complete the owner decisions using its judgment. The [current acceptance](policy-decisions/internal-mvp-owner-acceptance.md) completes all 12 operational dispositions for the exact synthetic target: ten observed engineering gates adopted, supervised synthetic records accepted, and independent certification waived for this test. This is a new scoped decision based on explicit delegation; the August history is not rewritten or treated as a personal re-review.
+
+The prepared synthetic journey is READY and requires no further owner-completion fields. Existing production/tag checkboxes above remain production requirements; confidential supplier/legal/records/key-custody facts are not supplied by this internal-test decision. Runtime controls, required tests, production preflight, merge and tag gates are unchanged.

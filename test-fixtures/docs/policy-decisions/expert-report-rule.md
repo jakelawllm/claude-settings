@@ -2,11 +2,11 @@
 
 ## Status
 
-APPROVED — leave-gated pathway permitted.
+APPROVED — synthetic strict-prohibition fixture.
 
 ## Decision
 
-The policy document permits expert-report preparation where prior leave is obtained from the responsible practitioner. The standing instruction and compliance skill have been updated to reflect this.
+The policy document prohibits drafting or preparing any part of an expert report. Prior leave does not remove that prohibition. This synthetic fixture exercises approval parsing; it is not a practice approval or deployment evidence.
 
 ## Files updated
 

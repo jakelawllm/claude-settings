@@ -7,8 +7,8 @@
  *   PreToolUse    binds the session to the first matter it touches and denies
  *                 any later path under a different matter
  *   SessionEnd    copies the completed transcript into the matter folder
- *   SessionStart  injects a reminder naming the bound matter (advisory only:
- *                 SessionStart cannot block)
+ *   SessionStart  binds an existing cwd matter and names it in a reminder
+ *                 (advisory only: SessionStart cannot block)
  *
  * Configuration, via the managed settings env block:
  *
@@ -19,8 +19,8 @@
  *                         material.
  *   CLAUDE_MATTER_MODE    enforce (block) | warn (observe) | off. Default
  *                         enforce.
- *   CLAUDE_RECORD_ROOT    optional. File records to <root>/<matter> instead of
- *                         the matter's own folder.
+ *   CLAUDE_RECORD_ROOT    optional. File records to
+ *                         <root>/<SHA-256 matter identity>/<matter>.
  *   CLAUDE_MATTER_ARCHIVE optional. Subfolder name. Default "_ai-record".
  *   CLAUDE_MATTER_STATE_DIR optional. Where session bindings are kept.
  *
@@ -42,9 +42,9 @@
  *
  * The operating system sandbox is what contains a Bash command, and enabling
  * it is necessary but not sufficient: Claude's sandbox permits reads across
- * the whole machine unless a per-matter filesystem policy is also configured,
- * and this repository does not yet generate one. Until it does, no part of
- * this file or the shipped template should be read as supplying per-matter
+ * the whole machine unless a per-matter filesystem policy is also configured.
+ * scripts/generate-matter-sandbox.py generates that policy; until deployed,
+ * no part of this file or the shipped template supplies per-matter
  * Bash isolation. Native Windows has no sandbox equivalent, and there the
  * guard is advisory for those routes.
  */
@@ -54,12 +54,13 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { createHash } = require('crypto');
+const { createHash, randomUUID } = require('crypto');
 
 const WIN = process.platform === 'win32';
 const ARCHIVE_DIR = process.env.CLAUDE_MATTER_ARCHIVE || '_ai-record';
 const RECORD_ROOT = process.env.CLAUDE_RECORD_ROOT || '';
-const MODE = (process.env.CLAUDE_MATTER_MODE || 'enforce').toLowerCase();
+const MODE = (process.env.CLAUDE_MATTER_MODE || 'enforce').trim().toLowerCase();
+let currentEvent;
 
 const STATE_DIR =
   process.env.CLAUDE_MATTER_STATE_DIR ||
@@ -70,7 +71,13 @@ const AUDIT_LOG = path.join(STATE_DIR, 'would-have-blocked.log');
  *  If stdout is unavailable we exit 2 so the PreToolUse contract still blocks. */
 function emit(obj) {
   try {
-    fs.writeSync(1, JSON.stringify(obj));
+    const output = Buffer.from(JSON.stringify(obj));
+    let offset = 0;
+    while (offset < output.length) {
+      const written = fs.writeSync(1, output, offset, output.length - offset);
+      if (!written) throw new Error('stdout did not accept the hook decision');
+      offset += written;
+    }
   } catch {
     /* stdout failed — fall back to blocking exit code per the documented hook contract */
     try { process.exit(2); } catch { /* best effort */ }
@@ -78,6 +85,27 @@ function emit(obj) {
 }
 
 function deny(reason) {
+  if (MODE === 'warn') {
+    let auditFailed = false;
+    try {
+      ensureStateDir();
+      try {
+        if (!fs.lstatSync(AUDIT_LOG).isFile()) throw new Error('audit log is not a regular file');
+      } catch (err) { if (err.code !== 'ENOENT') throw err; }
+      fs.appendFileSync(AUDIT_LOG, JSON.stringify({
+        timestamp: new Date().toISOString(),
+        session: sessionHash(currentEvent && currentEvent.session_id),
+        tool: currentEvent && currentEvent.tool_name,
+        reason,
+      }) + '\n', { encoding: 'utf8', mode: 0o600 });
+      if (!WIN) fs.chmodSync(AUDIT_LOG, 0o600);
+    } catch {
+      auditFailed = true;
+    }
+    emit({ systemMessage: `Matter separation warning: ${reason} Allowed because the guard is in warn mode.` +
+      (auditFailed ? ' The observation log could NOT be written; repair it before evaluating enforcement readiness.' : '') });
+    return true;
+  }
   emit({
     hookSpecificOutput: {
       hookEventName: 'PreToolUse',
@@ -92,10 +120,9 @@ function deny(reason) {
 function denyFault(what) {
   return deny(
     `The matter separation guard cannot verify that this action stays within ` +
-      `one matter (${what}), so it is refusing it. This is a fault in the ` +
+      `one matter (${what}). This is a fault in the ` +
       `guard or its deployment, not a judgement about the task. Report it to ` +
-      `the AI Officer before continuing client work. To run without enforcing ` +
-      `while it is fixed, set CLAUDE_MATTER_MODE=warn.`
+      `the AI Officer before continuing client work.`
   );
 }
 
@@ -109,68 +136,70 @@ function fold(s) {
 }
 
 function isAbsolutePath(p) {
-  return /^([a-zA-Z]:[\\/]|\\\\|\/\/|\/)/.test(p);
+  return typeof p === 'string' && path.isAbsolute(p) && (!WIN || !/^[\\/][^\\/]/.test(p));
 }
 
 /**
- * Reduce a path to a comparable form. Separators are normalised, extended
- * length prefixes removed, and "." and ".." resolved so a path that leaves the
- * bound matter and re-enters another is not read as its first segment. The
- * POSIX root and the UNC double slash are both preserved: stripping either
- * turns an absolute path into a relative one and breaks every comparison and
- * the archive destination with it.
+ * Compare paths already resolved by realCanonical. Preserve POSIX backslashes
+ * (valid filename characters), normalise Windows separators and device prefixes,
+ * and retain the filesystem root.
  */
 function canonical(p) {
-  if (!p) return '';
-  let s = String(p).trim().replace(/\\/g, '/');
-  s = s.replace(/^\/\/\?\/unc\//i, '//'); // \\?\UNC\host\share
-  s = s.replace(/^\/\/\?\//, ''); // \\?\C:\...
-
-  const unc = s.startsWith('//');
-  const rooted = !unc && s.startsWith('/');
-  const parts = (unc ? s.slice(2) : s).split('/');
-  const prefix = unc ? parts.splice(0, 2) : []; // host and share are fixed
-  const out = [];
-  for (const seg of parts) {
-    if (seg === '' || seg === '.') continue;
-    if (seg === '..') {
-      out.pop();
-      continue;
-    }
-    out.push(seg);
-  }
-  const joined = [...prefix, ...out].join('/');
-  const lead = unc ? '//' : rooted ? '/' : '';
-  return fold((lead + joined).replace(/(.)\/+$/, '$1'));
+  let s = WIN ? p.replace(/\\/g, '/') : p;
+  s = s.replace(/^\/\/\?\/unc\//i, '//').replace(/^\/\/\?\//, '');
+  return fold(s.replace(/(.)\/+$/, '$1'));
 }
 
 /**
  * Canonical form of the path the filesystem actually reaches. A path lexically
  * inside one matter can be a symlink or junction into another, so comparison on
- * the literal string is not a boundary. The deepest existing ancestor is
- * resolved and the unresolved remainder appended, which covers a write to a
- * file that does not exist yet.
+ * the literal string is not a boundary. Resolve every component before applying
+ * a following parent segment. Missing components can be appended for writes;
+ * inaccessible paths, non-directory ancestors and dangling links must refuse.
  */
 function realCanonical(p) {
-  if (!p) return '';
-  if (String(p).length > 4096) {
-    // path too long — cannot safely canonicalise
-    return ''; // empty string will not match any root, will be treated as non-client
+  if (!isAbsolutePath(p) || p.length > 32768 || p.includes('\0')) {
+    throw new Error('path must be a usable absolute path');
   }
-  let current = String(p);
-  const tail = [];
-  for (let i = 0; i < 64; i++) {
+  if (WIN && /^\\\\\.\\/.test(p)) throw new Error('device paths are not supported');
+  const root = path.parse(p).root;
+  let current = fs.realpathSync(root);
+  // Resolve one component at a time. Normalising ".." before following a
+  // symlink can change the directory actually reached on POSIX.
+  for (const segment of p.slice(root.length).split(WIN ? /[\\/]/ : /\//)) {
+    if (!segment || segment === '.') continue;
     try {
-      const resolved = fs.realpathSync(current);
-      return canonical(tail.length ? path.join(resolved, ...tail.reverse()) : resolved);
-    } catch {
-      const parent = path.dirname(current);
-      if (!parent || parent === current) break;
-      tail.push(path.basename(current));
-      current = parent;
+      if (!fs.statSync(current).isDirectory()) throw new Error('path ancestor is not a directory');
+    } catch (err) {
+      if (err.code !== 'ENOENT') throw err;
+    }
+    if (segment === '..') {
+      current = path.dirname(current);
+      continue;
+    }
+    const next = path.join(current, segment);
+    try {
+      current = fs.realpathSync(next);
+    } catch (err) {
+      // Only a genuinely missing component can be appended for a future write.
+      // EACCES, ENOTDIR, ELOOP and dangling links are resolution failures.
+      if (err.code !== 'ENOENT') throw new Error('path resolution failed: ' + err.code);
+      let entry;
+      try { entry = fs.lstatSync(next); } catch (statError) {
+        if (statError.code !== 'ENOENT') throw new Error('path inspection failed: ' + statError.code);
+      }
+      if (entry) throw new Error('path contains an unresolved symbolic link');
+      current = next;
     }
   }
-  return '';
+  const resolved = canonical(current);
+  if (p.slice(root.length).split(WIN ? /[\\/]/ : /\//).includes('..') &&
+      realCanonical(path.resolve(p)) !== resolved) {
+    // Some clients normalise before opening; POSIX may follow the link first.
+    // Refuse an ambiguous spelling instead of guessing which target is used.
+    throw new Error('parent traversal through a symbolic link is ambiguous; use the direct path');
+  }
+  return resolved;
 }
 
 // --------------------------------------------------------------------------
@@ -192,10 +221,16 @@ const PLACEHOLDER = /replace-with|your-matters-root|example\.invalid$/i;
  * none of them resolve there is no boundary to enforce, and that is fatal.
  */
 function resolveRoots() {
+  try { return validatedRoots(); } catch (err) {
+    return { matterRoots: [], recordRoots: [], error: err.message };
+  }
+}
+
+function validatedRoots() {
   const raw = (process.env.CLAUDE_MATTER_ROOTS || '').split(';').map((s) => s.trim()).filter(Boolean);
   if (raw.length === 0) return { matterRoots: [], recordRoots: [], error: 'CLAUDE_MATTER_ROOTS is not set' };
 
-  const placeholders = raw.filter((r) => PLACEHOLDER.test(r) && !fs.existsSync(r));
+  const placeholders = raw.filter((r) => PLACEHOLDER.test(r));
   if (placeholders.length) {
     return { matterRoots: [], recordRoots: [], error: 'CLAUDE_MATTER_ROOTS still contains the shipped placeholder' };
   }
@@ -206,9 +241,11 @@ function resolveRoots() {
 
   const present = raw.filter((r) => {
     try {
-      return fs.existsSync(r);
-    } catch {
-      return false;
+      if (!fs.statSync(r).isDirectory()) throw new Error('a configured matter root is not a directory');
+      return true;
+    } catch (err) {
+      if (err.code === 'ENOENT') return false;
+      throw err;
     }
   });
   const usable = present.map(realCanonical).filter(Boolean);
@@ -222,22 +259,45 @@ function resolveRoots() {
     return true;
   });
 
-  // Separate matter roots from record root
-  const recordRootCanon = RECORD_ROOT ? realCanonical(RECORD_ROOT) : null;
-  const matterRoots = deduped.filter(r => r !== recordRootCanon);
-
-  if (matterRoots.length === 0) {
-    return { matterRoots: [], recordRoots: [], error: 'no matter roots available after excluding record root' };
+  if (!['enforce', 'warn', 'off'].includes(MODE)) {
+    throw new Error('CLAUDE_MATTER_MODE must be enforce, warn, or off');
   }
-
-  // Longest first: an archive nested inside the matters root must match as the
-  // archive, not be read as a matter named after its own folder.
+  if (!ARCHIVE_DIR || ARCHIVE_DIR === '.' || ARCHIVE_DIR === '..' ||
+      /[\\/:\0]/.test(ARCHIVE_DIR) || /[. ]$/.test(ARCHIVE_DIR)) {
+    throw new Error('CLAUDE_MATTER_ARCHIVE must be one safe subfolder name');
+  }
+  if (!isAbsolutePath(STATE_DIR)) throw new Error('CLAUDE_MATTER_STATE_DIR must be absolute');
+  const stateCanon = realCanonical(STATE_DIR);
+  let recordRootCanon = null;
+  if (RECORD_ROOT) {
+    if (PLACEHOLDER.test(RECORD_ROOT)) throw new Error('CLAUDE_RECORD_ROOT contains a placeholder');
+    recordRootCanon = realCanonical(RECORD_ROOT);
+    if (fs.existsSync(RECORD_ROOT) && !fs.statSync(RECORD_ROOT).isDirectory()) {
+      throw new Error('CLAUDE_RECORD_ROOT must be a directory');
+    }
+  }
+  const matterRoots = deduped;
+  for (const root of matterRoots) {
+    if (matterRoots.some((other) => other !== root && isWithin(root, other))) {
+      throw new Error('configured matter roots must not overlap');
+    }
+    if (isWithin(stateCanon, root) || isWithin(root, stateCanon)) {
+      throw new Error('state directory and matter roots must not overlap');
+    }
+    if (recordRootCanon && (isWithin(root, recordRootCanon) ||
+        (isWithin(recordRootCanon, root) && path.posix.dirname(recordRootCanon) !== root))) {
+      throw new Error('record root must be outside matters or an immediate child of a matter root');
+    }
+  }
+  if (recordRootCanon && (isWithin(stateCanon, recordRootCanon) || isWithin(recordRootCanon, stateCanon))) {
+    throw new Error('state directory and record root must not overlap');
+  }
   const recordRoots = recordRootCanon ? [recordRootCanon] : [];
-  return { matterRoots: matterRoots.sort((a, b) => b.length - a.length), recordRoots, error: null };
+  return { matterRoots: matterRoots.sort((a, b) => b.length - a.length), recordRoots, stateCanon, error: null };
 }
 
 function isWithin(child, parent) {
-  return child === parent || child.startsWith(parent + '/');
+  return child === parent || child.startsWith(parent.endsWith('/') ? parent : parent + '/');
 }
 
 /**
@@ -247,14 +307,22 @@ function isWithin(child, parent) {
  */
 function matterOf(candidate, matterRoots, recordRoots) {
   const c = realCanonical(candidate);
-  if (!c) return null;
+
+  if ([...matterRoots, ...recordRoots].some((root) => isWithin(root, c))) return { type: 'root' };
 
   // First check record roots
   for (const root of recordRoots) {
     if (!isWithin(c, root)) continue;
-    if (c === root) return { type: 'record-root' };
-    const name = c.slice(root.length + 1).split('/')[0];
-    return { name, id: 'record:' + root + '/' + name, dir: root + '/' + name };
+    const [hash, name] = c.slice(root.length + 1).split('/');
+    if (!/^[a-f0-9]{64}$/.test(hash) || !name) return { type: 'root' };
+    for (const matterRoot of matterRoots) {
+      const dir = matterRoot + '/' + name;
+      const id = 'matter:' + dir;
+      if (matterHash(id) === hash && realCanonical(dir) === dir && fs.statSync(dir).isDirectory()) {
+        return { name, id, dir };
+      }
+    }
+    return { type: 'root' }; // legacy, unknown or ambiguous archive identity
   }
 
   // Then check matter roots
@@ -285,18 +353,26 @@ const TOOL_CAPS = {
   Glob: { targets: ['path'] },
   // Process tools
   Bash: { type: 'bash' }, // working-directory only; see the note at the head of the file
-  PowerShell: { type: 'deny' }, // SEC-02: always deny
+  PowerShell: { type: 'deny' }, // refused in enforce; observed in warn
   // Network/transmission tools
-  WebFetch: { targets: ['url'] },
-  WebSearch: { targets: ['query'] },
-  // Orchestration tools — non-resource so they cannot leak file paths into a tool call
+  WebFetch: { type: 'network' },
+  WebSearch: { type: 'network' },
+  // Orchestration tools have no direct filesystem target. Their child tool
+  // calls still require managed hooks and OS isolation.
   Skill: { type: 'non-resource' },
   AskUserQuestion: { type: 'non-resource' },
   Agent: { type: 'non-resource' },
   TaskCreate: { type: 'non-resource' },
   TaskUpdate: { type: 'non-resource' },
-  Monitor: { type: 'non-resource' },
-  LSP: { type: 'non-resource' },
+  Monitor: { type: 'bash' },
+  LSP: { targets: ['filePath'] },
+  TaskGet: { type: 'non-resource' },
+  TaskList: { type: 'non-resource' },
+  TaskStop: { type: 'non-resource' },
+  TaskOutput: { type: 'non-resource' },
+  TodoWrite: { type: 'non-resource' },
+  EnterPlanMode: { type: 'non-resource' },
+  ExitPlanMode: { type: 'non-resource' },
   // Lifecycle
   SessionStart: { type: 'non-resource' },
   SessionEnd: { type: 'non-resource' },
@@ -305,15 +381,19 @@ const TOOL_CAPS = {
 
 /** The registry entry for a tool, or the 'unknown' sentinel if it is not listed. */
 function capsOf(toolName) {
-  return TOOL_CAPS[toolName] || { type: 'unknown' };
+  return Object.hasOwn(TOOL_CAPS, toolName) ? TOOL_CAPS[toolName] : { type: 'unknown' };
 }
 
 /** Every path a tool call would touch. An unknown tool contributes nothing. */
 function targetsOf(toolName, input) {
-  if (!input) return [];
   const caps = capsOf(toolName);
   if (!caps.targets) return [];
-  return caps.targets.map((k) => input[k]).filter((v) => typeof v === 'string');
+  const targets = caps.targets.filter((k) => Object.hasOwn(input, k)).map((k) => input[k]);
+  if (targets.some((v) => typeof v !== 'string' || !v || v.includes('\0'))) {
+    throw new Error('tool path is missing or malformed');
+  }
+  if (!targets.length && !['Grep', 'Glob'].includes(toolName)) throw new Error('required tool path is missing');
+  return targets;
 }
 
 // --------------------------------------------------------------------------
@@ -326,13 +406,17 @@ function targetsOf(toolName, input) {
  * name, or be used to probe the state directory. Hashing removes both.
  */
 function statePath(sessionId) {
-  const h = createHash('sha256').update('matter-guard:' + String(sessionId)).digest('hex');
-  return path.join(STATE_DIR, h + '.json');
+  return path.join(STATE_DIR, sessionHash(sessionId) + '.json');
 }
+
+const sessionHash = (id) => createHash('sha256').update('matter-guard:' + String(id)).digest('hex');
+const matterHash = (id) => createHash('sha256').update(id).digest('hex');
 
 /** Private by construction: the state names matters and sessions. */
 function ensureStateDir() {
+  if (!isAbsolutePath(STATE_DIR)) throw new Error('state directory must be absolute');
   fs.mkdirSync(STATE_DIR, { recursive: true, mode: 0o700 });
+  if (!fs.lstatSync(STATE_DIR).isDirectory()) throw new Error('state directory must not be a link');
   if (!WIN) {
     // mkdir honours the umask, so the mode above is a request, not a result.
     fs.chmodSync(STATE_DIR, 0o700);
@@ -343,6 +427,9 @@ function ensureStateDir() {
 function readBinding(sessionId) {
   let raw;
   try {
+    ensureStateDir();
+    if (!fs.lstatSync(statePath(sessionId)).isFile()) throw new Error('binding must be a regular file');
+    if (!WIN) fs.chmodSync(statePath(sessionId), 0o600);
     raw = fs.readFileSync(statePath(sessionId), 'utf8');
   } catch (err) {
     if (err && err.code === 'ENOENT') return null;
@@ -353,6 +440,15 @@ function readBinding(sessionId) {
     throw new Error('binding is malformed');
   }
   return b;
+}
+
+function validateBinding(binding, config) {
+  if (!binding) return;
+  const resolved = matterOf(binding.dir, config.matterRoots, config.recordRoots);
+  if (!resolved || resolved.type || resolved.id !== binding.id || resolved.name !== binding.name ||
+      resolved.dir !== binding.dir || !fs.statSync(binding.dir).isDirectory()) {
+    throw new Error('binding does not identify an existing configured matter');
+  }
 }
 
 /**
@@ -377,7 +473,7 @@ function writeBinding(sessionId, binding) {
     throw err;
   }
   try {
-    fs.writeSync(fd, JSON.stringify(binding));
+    fs.writeFileSync(fd, JSON.stringify(binding), 'utf8');
     fs.fsyncSync(fd);
   } finally {
     fs.closeSync(fd);
@@ -389,228 +485,181 @@ function writeBinding(sessionId, binding) {
 // Events
 // --------------------------------------------------------------------------
 
-function warn(ev, binding, touched) {
-  try {
-    ensureStateDir();
-    fs.appendFileSync(
-      AUDIT_LOG,
-      JSON.stringify({
-        session: String(ev.session_id).slice(0, 8),
-        tool: ev.tool_name,
-        bound_matter: binding.name,
-        reached_matter: touched.name,
-      }) + '\n',
-      { encoding: 'utf8', mode: 0o600 }
-    );
-  } catch {
-    /* an audit write failure must not change the outcome of the tool call */
-  }
-  emit({
-    systemMessage:
-      `Matter separation warning: this session is bound to "${binding.name}" ` +
-      `and just reached "${touched.name}". Allowed because the guard is in ` +
-      `warn mode. In enforce mode this would have been refused.`,
-  });
-  return true;
-}
-
 function preToolUse(ev) {
-  if (MODE === 'off') return;
-
-  // SEC-06: a tool outside the approved registry is refused in enforce mode
-  // rather than silently passed through as contributing no targets.
+  if (!['enforce', 'warn'].includes(MODE)) return denyFault('CLAUDE_MATTER_MODE must be enforce, warn, or off');
   const caps = capsOf(ev.tool_name);
-  if (caps.type === 'deny') {
-    return deny(
-      'PowerShell and equivalent shell tools are not permitted under the firm matter-separation policy.'
-    );
-  }
-  if (caps.type === 'unknown' && MODE === 'enforce') {
-    return denyFault('unknown tool: ' + ev.tool_name + ' — not in the approved tool registry');
-  }
+  if (caps.type === 'deny') return deny('PowerShell tools are not permitted under the matter-separation policy.');
+  if (caps.type === 'unknown') return denyFault('unknown tool: ' + ev.tool_name + ' — not in the approved tool registry');
 
-  const { matterRoots, recordRoots, error } = resolveRoots();
-  if (error) {
-    if (MODE !== 'enforce') return; // nothing to warn about without a boundary
-    return denyFault(error);
+  const config = resolveRoots();
+  if (config.error) return denyFault(config.error);
+  const { matterRoots, recordRoots, stateCanon } = config;
+  if (ev.tool_name === 'Glob' && ev.tool_input.pattern !== undefined &&
+      (typeof ev.tool_input.pattern !== 'string' ||
+       /(^|[,{])(?:[\\/~]|[a-z]:)|\.\.|\\\.|\[[^\]]*\.[^\]]*\]/i.test(ev.tool_input.pattern))) {
+    return denyFault('Glob patterns must be relative and contain no parent traversal; use the path field for a directory');
   }
+  // The event cwd, not the hook process cwd, anchors relative tool paths.
+  if (!isAbsolutePath(ev.cwd) || !fs.statSync(ev.cwd).isDirectory()) return denyFault('cwd must be an existing absolute directory');
+  const targets = targetsOf(ev.tool_name, ev.tool_input).map((target) => {
+    if (isAbsolutePath(target)) return target;
+    if (/^[a-z]:/i.test(target) || (WIN && /^[\\/]/.test(target))) throw new Error('drive-relative paths are not supported');
+    return ev.cwd + path.sep + target;
+  });
+  if (targets.some((target) => {
+    const c = realCanonical(target);
+    return isWithin(c, stateCanon) || isWithin(stateCanon, c);
+  })) return denyFault('tool access to the private matter-guard state or its ancestors is not permitted');
 
-  // SEC-03: a session launched above any matters root can reach every matter
-  // from its working directory alone, with no matter-qualified path in play.
-  // Use some(): if cwd IS a matter root OR contains any matter root, deny.
-  // Record roots are excluded from this check (they are not matters).
-  const cwdCanon = realCanonical(ev.cwd);
-  if (cwdCanon && matterRoots.length && matterRoots.some((r) => r === cwdCanon || isWithin(r, cwdCanon))) {
-    return denyFault('session launched above matters root — launch from inside one matter folder');
+  const touched = [...targets, ev.cwd].map((candidate) => matterOf(candidate, matterRoots, recordRoots)).filter(Boolean);
+  if (touched.some((m) => m.type === 'root')) {
+    return denyFault('path reaches a matter/archive root, its ancestor, or an unrecognised archive identity — use one matter folder');
   }
-
-  const candidates = [...targetsOf(ev.tool_name, ev.tool_input), ev.cwd];
-  const touched = candidates.map((c) => matterOf(c, matterRoots, recordRoots)).filter(Boolean);
-  if (touched.some((t) => t.type === 'root')) {
-    return denyFault(
-      'path equals a configured matters root — sessions must be launched from inside one matter, not at the root level'
-    );
+  // Validate persisted state even for non-client calls: corruption cannot be
+  // used to make the control appear healthy until the next matter read.
+  let binding = readBinding(ev.session_id);
+  validateBinding(binding, config);
+  const distinct = [...new Map(touched.map((m) => [m.id, m])).values()];
+  if (distinct.length > 1) return deny('This call touches more than one matter. Start a session in a single matter folder.');
+  if (!distinct.length) return;
+  const candidate = distinct[0];
+  if (!binding) {
+    validateBinding(candidate, config);
+    binding = writeBinding(ev.session_id, candidate);
+    if (!binding) throw new Error('binding disappeared during first-touch registration');
+    validateBinding(binding, config);
   }
-  if (touched.length === 0) return; // no client material in play
-
-  let binding;
-  try {
-    binding = readBinding(ev.session_id);
-  } catch (err) {
-    if (MODE !== 'enforce') return;
-    return denyFault(`the session's matter binding could not be read: ${err.message}`);
-  }
-
-  // SEC-07: validate the complete candidate set before committing any binding.
-  // Never write state for a call that will be denied.
-  const matterTouches = touched.filter((t) => t.type !== 'record-root' && t.type !== 'root');
-  if (matterTouches.length === 0) {
-    // Only record-root material is in play. Without a prior binding there is
-    // nothing to bind to; with a binding, record access is allowed only if the
-    // archive identity matches (handled below via id comparison when present).
-    if (!binding) return;
-  }
-
-  // Distinct matter identities in one call: refuse without writing a binding.
-  const distinctIds = [...new Set(matterTouches.map((t) => t.id))];
-  if (distinctIds.length > 1) {
-    if (MODE === 'warn') {
-      return warn(ev, binding || matterTouches[0], matterTouches[1]);
-    }
-    return deny(
-      `Blocked by the firm's matter-separation policy. This call touches more ` +
-        `than one matter (${matterTouches.map((t) => t.name).join(', ')}). ` +
-        `Close this session and start a new one in a single matter folder.`
-    );
-  }
-
-  const candidateMatter = matterTouches[0] || null;
-
-  if (!binding && candidateMatter) {
-    try {
-      const result = writeBinding(ev.session_id, {
-        id: candidateMatter.id,
-        name: candidateMatter.name,
-        dir: candidateMatter.dir,
-      });
-      // Exclusive-create lost the race: compare the winner before allowing.
-      if (result && result.id && result.id !== candidateMatter.id) {
-        if (MODE === 'warn') return warn(ev, result, candidateMatter);
-        return deny(
-          `Blocked by the firm's matter-separation policy. This session is ` +
-            `confined to the matter "${result.name}" and the path requested ` +
-            `belongs to "${candidateMatter.name}". Do not retry, and do not ` +
-            `attempt another route to the same file. Close this session and ` +
-            `start a new one in the other matter's folder.`
-        );
-      }
-      binding = result && result.id ? result : candidateMatter;
-    } catch (err) {
-      if (MODE !== 'enforce') return;
-      return denyFault(`the session's matter binding could not be saved: ${err.message}`);
-    }
-  }
-
-  for (const t of matterTouches) {
-    if (binding && t.id !== binding.id) {
-      if (MODE === 'warn') return warn(ev, binding, t);
-      return deny(
-        `Blocked by the firm's matter-separation policy. This session is ` +
-          `confined to the matter "${binding.name}" and the path requested ` +
-          `belongs to "${t.name}". Do not retry, and do not attempt another ` +
-          `route to the same file. Close this session and start a new one in ` +
-          `the other matter's folder.`
-      );
-    }
+  if (binding.id !== candidate.id) {
+    return deny(`This session is confined to matter "${binding.name}" and the requested path belongs to "${candidate.name}". Start a new session in the other matter's folder.`);
   }
 }
 
 function sessionStart(ev) {
-  const { matterRoots, recordRoots, error } = resolveRoots();
-  const m = error ? null : matterOf(ev.cwd, matterRoots, recordRoots);
-  const context = error
-    ? `The matter separation guard is not usable: ${error}. Client work should ` +
-      `not proceed until it is fixed.`
-    : m && m.type !== 'record-root'
-      ? `This session is confined to the matter "${m.name}". Files belonging to ` +
-        `any other matter are blocked and must not be accessed by any route.`
-      : `This session did not start in a matter folder. Do not open client ` +
-        `material from more than one matter; the first matter touched binds ` +
-        `the session and the rest are blocked.`;
+  const config = resolveRoots();
+  let context;
+  try {
+    if (config.error) throw new Error(config.error);
+    let binding = readBinding(ev.session_id);
+    validateBinding(binding, config);
+    const m = matterOf(ev.cwd, config.matterRoots, config.recordRoots);
+    if (!binding && m && !m.type) {
+      // Prompt-only sessions also need an unambiguous archive destination.
+      validateBinding(m, config);
+      binding = writeBinding(ev.session_id, m);
+      validateBinding(binding, config);
+    }
+    context = binding
+      ? `This session is bound to matter "${binding.name}". ` +
+        (MODE === 'warn' ? 'The guard is observing only; cross-matter calls are allowed and reported.' :
+          'Cross-matter file calls are blocked. Bash still requires OS isolation.')
+      : 'This session did not start in one matter folder. Start inside a single matter before client work.';
+  } catch (err) {
+    context = `The matter separation guard is not usable (${err.message}). Client work should not proceed until it is fixed.`;
+  }
   emit({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: context } });
 }
 
-/** File the transcript. SessionEnd guarantees the transcript is complete. */
+/** Convenience archive only: the external records schema is not emitted here. */
 function sessionEnd(ev) {
-  const { matterRoots, recordRoots, error } = resolveRoots();
-  if (error || !ev.transcript_path) return;
-
-  let binding = null;
+  let tmp;
   try {
-    binding = readBinding(ev.session_id);
-  } catch {
-    binding = null;
-  }
-  if (!binding || !binding.dir || !binding.name) {
-    // REC-03: do not silently infer from cwd when the binding is missing or
-    // corrupt. Surface the records gap to the practitioner instead.
-    emit({
-      systemMessage:
-        `Session record could NOT be filed: the session binding is missing or unreadable. ` +
-        `Record the session on the matter file by hand and investigate state integrity.`,
-    });
-    return;
-  }
-
-  try {
-    if (!fs.existsSync(ev.transcript_path)) return;
-    const dest = RECORD_ROOT
-      ? path.join(RECORD_ROOT, binding.name)
-      : path.join(binding.dir.replace(/\//g, path.sep), ARCHIVE_DIR);
-    fs.mkdirSync(dest, { recursive: true });
-
-    const stamp = fs.statSync(ev.transcript_path).mtime.toISOString().replace(/[:.]/g, '-');
-    const name = `session-${stamp}-${String(ev.session_id).slice(0, 8)}.jsonl`;
-    const final = path.join(dest, name);
-    const tmp = `${final}.${process.pid}.part`;
-    // Copy then rename, so an interrupted copy never leaves a partial file
-    // looking like a complete record.
-    fs.copyFileSync(ev.transcript_path, tmp);
-    fs.renameSync(tmp, final);
-
-    emit({ systemMessage: `Session record filed to ${ARCHIVE_DIR}.` });
+    const config = resolveRoots();
+    if (config.error) throw new Error(config.error);
+    const binding = readBinding(ev.session_id);
+    if (!binding) throw new Error('the session binding is missing');
+    validateBinding(binding, config);
+    if (!isAbsolutePath(ev.transcript_path)) throw new Error('transcript_path must be absolute');
+    const transcriptStat = fs.statSync(ev.transcript_path);
+    if (!transcriptStat.isFile() || !transcriptStat.size) throw new Error('transcript is missing, empty, or not a regular file');
+    const expectedDest = RECORD_ROOT
+      ? config.recordRoots[0] + '/' + matterHash(binding.id) + '/' + binding.name
+      : binding.dir + '/' + ARCHIVE_DIR;
+    // Reject an archive folder replaced by a symlink/junction to another path.
+    if (realCanonical(expectedDest) !== canonical(expectedDest)) throw new Error('archive destination resolves outside its expected directory');
+    fs.mkdirSync(expectedDest, { recursive: true, mode: 0o700 });
+    if (!WIN) {
+      fs.chmodSync(expectedDest, 0o700);
+      if (RECORD_ROOT) {
+        fs.chmodSync(config.recordRoots[0], 0o700);
+        fs.chmodSync(path.dirname(expectedDest), 0o700);
+      }
+    }
+    const stamp = transcriptStat.mtime.toISOString().replace(/[:.]/g, '-');
+    const final = path.join(expectedDest, `session-${stamp}-${sessionHash(ev.session_id)}.jsonl`);
+    tmp = `${final}.${randomUUID()}.part`;
+    // Write privately and durably, then publish via an exclusive hard link.
+    // A retry never overwrites an earlier archive, and a torn copy stays .part.
+    const fd = fs.openSync(tmp, 'wx', 0o600);
+    try {
+      const source = fs.openSync(ev.transcript_path, 'r');
+      try {
+        const buffer = Buffer.alloc(64 * 1024);
+        let count;
+        while ((count = fs.readSync(source, buffer, 0, buffer.length, null)) > 0) {
+          let written = 0;
+          while (written < count) written += fs.writeSync(fd, buffer, written, count - written);
+        }
+      } finally { fs.closeSync(source); }
+      fs.fsyncSync(fd);
+    } finally { fs.closeSync(fd); }
+    try { fs.linkSync(tmp, final); } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+      if (!fs.lstatSync(final).isFile() || hashFile(final) !== hashFile(tmp)) {
+        throw new Error('archive already exists with different content; original preserved');
+      }
+    }
+    emit({ systemMessage: 'Session record filed to the configured matter archive.' });
   } catch (err) {
-    // Never fail the session on an archive error, but say so: an unfiled
-    // transcript is a records gap the practitioner needs to know about.
-    emit({
-      systemMessage:
-        `Session record could NOT be filed to the matter (${err.message}). ` +
-        `Record the session on the matter file by hand.`,
-    });
+    emit({ systemMessage: `Session record could NOT be filed (${err.message}). Record the session on the matter file by hand and investigate the archive failure.` });
+  } finally {
+    if (tmp) {
+      try { fs.unlinkSync(tmp); } catch { /* Only this invocation's private staging file. */ }
+    }
   }
+}
+
+function hashFile(filename) {
+  const hash = createHash('sha256');
+  const fd = fs.openSync(filename, 'r');
+  try {
+    const buffer = Buffer.alloc(64 * 1024);
+    let count;
+    while ((count = fs.readSync(fd, buffer, 0, buffer.length, null)) > 0) hash.update(buffer.subarray(0, count));
+    return hash.digest('hex');
+  } finally { fs.closeSync(fd); }
 }
 
 // --------------------------------------------------------------------------
 
 function dispatch(raw) {
+  if (MODE === 'off') return;
   let ev;
   try {
     ev = JSON.parse(raw);
-    if (!ev || typeof ev !== 'object') throw new Error('not an object');
+    if (!ev || typeof ev !== 'object' || Array.isArray(ev)) throw new Error('not an object');
   } catch {
     // Unreadable input means the guard cannot know what is being attempted.
-    if (MODE === 'enforce') denyFault('the hook received input it could not read');
+    denyFault('the hook received input it could not read');
     return;
+  }
+  currentEvent = ev;
+  if (typeof ev.session_id !== 'string' || !ev.session_id.trim() || ev.session_id.length > 4096) {
+    if (ev.hook_event_name === 'SessionEnd') return emit({ systemMessage: 'Session record could NOT be filed: invalid session ID.' });
+    return denyFault('the hook requires a nonempty session ID');
   }
   switch (ev.hook_event_name) {
     case 'PreToolUse':
+      if (typeof ev.tool_name !== 'string' || !ev.tool_name || !ev.tool_input ||
+          typeof ev.tool_input !== 'object' || Array.isArray(ev.tool_input)) {
+        return denyFault('tool name and tool input are required');
+      }
       return preToolUse(ev);
     case 'SessionStart':
       return sessionStart(ev);
     case 'SessionEnd':
       return sessionEnd(ev);
     default:
-      return;
+      return denyFault('unknown or missing hook event');
   }
 }
 
@@ -626,11 +675,11 @@ function main() {
     } catch (err) {
       // An unexpected exception would otherwise exit non-zero, which Claude
       // Code treats as non-blocking: the guard would fail open on a bug.
-      if (MODE === 'enforce') denyFault(`unexpected error: ${err && err.message}`);
+      if (MODE !== 'off') denyFault(`unexpected error: ${err && err.message}`);
     }
   });
   process.stdin.on('error', () => {
-    if (MODE === 'enforce') denyFault('the hook could not read its input');
+    if (MODE !== 'off') denyFault('the hook could not read its input');
   });
 }
 

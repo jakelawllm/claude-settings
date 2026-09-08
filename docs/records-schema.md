@@ -88,3 +88,9 @@ An archive write failure is non-fatal to the Claude Code session. It is fatal to
 ## Synthetic fixture
 
 The fixture embedded in this document is intentionally synthetic. It may be copied into a test without introducing real matter identifiers, paths, users or hostnames.
+
+## Implemented producer boundary (2026-09-07)
+
+The JSON above is an external service example, not an event produced by matter-guard.js. The local hook produces a JSONL copy only. Its filename uses the source transcript mtime in UTC and the full hashed session ID. Central archives are placed under the full SHA-256 of the canonical matter identity, followed by the matter name. An external adapter must supply the timestamps and bundle/transcript hashes in this contract from trusted evidence; no adapter is implemented here.
+
+The schema example test validates this document. It does not exercise registry lookup, durable storage, duplicate-event handling or a records service. Actual copying, refusal, retry and restart behavior is tested through hook subprocesses. See [operations](operations.md) for filesystem requirements and legacy archive handling.

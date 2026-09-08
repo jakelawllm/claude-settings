@@ -15,3 +15,12 @@ __pycache__/
 # Production-readiness review and planning artefacts
 production-readiness-gates-planning-report.md
 claude-settings-production-readiness-review.md
+
+# Local development and private configuration
+.venv/
+.env
+.env.*
+!.env.example
+
+# Local agent runtime: credentials, session history and vendored plugin caches
+/.claude-orch/

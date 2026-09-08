@@ -29,6 +29,15 @@ jobs:
         with:
           node-version: '22'
 
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: runner.os == 'Windows'
+        with:
+          python-version: '3.12'
+
+      - name: Restore locked dependencies on Windows
+        if: runner.os == 'Windows'
+        run: python -m pip install --require-hashes -r requirements-lock.txt
+
       # The documented command, unchanged. If this needs an argument or an
       # environment variable to pass, the documentation is wrong.
       - name: Hook tests
@@ -39,6 +48,12 @@ jobs:
 
       - name: Documentation control claims
         run: node tests/docs-control-claims.test.js
+
+      - name: Text scanner regressions
+        run: node tests/scan-history.test.js
+
+      - name: Office scanner regressions
+        run: node tests/scan-docx-xml.test.js
 
       # The end-to-end tier launches real Claude Code sessions and needs a
       # signed-in installation, so it cannot run here. It is checked for syntax
@@ -52,90 +67,22 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
 
-      - name: Validate JSON
-        run: |
-          for f in managed-settings.json settings.json matter-settings.json; do
-            python -c "import json,sys; json.load(open(sys.argv[1])); print(sys.argv[1], 'ok')" "$f"
-          done
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
 
       - name: Install locked Python dependencies
-        run: pip install --require-hashes -r requirements-lock.txt
+        run: python -m pip install --require-hashes -r requirements-lock.txt
 
-      - name: Validate settings schema
-        run: |
-          python3 - <<'PY'
-          import hashlib, pathlib, sys
-          schema = pathlib.Path('schemas/claude-code-settings.schema.json')
-          expected = pathlib.Path('schemas/claude-code-settings.schema.json.sha256').read_text(encoding='utf-8').split()[0]
-          actual = hashlib.sha256(schema.read_bytes()).hexdigest()
-          if actual != expected:
-              print(f'schema hash mismatch: expected {expected}, got {actual}')
-              sys.exit(1)
-          PY
-          check-jsonschema --schemafile schemas/claude-code-settings.schema.json managed-settings.json settings.json matter-settings.json
-
-      # The Markdown policy is generated. If it has drifted from the DOCX, the
-      # repository is publishing something the authoritative document does not
-      # say.
-      - name: Policy Markdown is in step with the DOCX
-        run: |
-          for d in ai-policy-legal-practice-template ai-protocol-barristers-chambers; do
-            python scripts/docx-to-md.py "$d.docx" "/tmp/$d.regen.md"
-            diff -u "$d.md" "/tmp/$d.regen.md"
-          done
-
-      # Clause references are load-bearing: the settings, the skill and the
-      # README all cite them, and a renumbered policy silently invalidates them.
-      - name: Clause references resolve
-        run: python scripts/check-clause-refs.py
-
-      - name: Preflight validate template
-        run: python3 scripts/preflight-validate.py --mode template managed-settings.json
-        # Expected: warnings only (placeholders are intentional in template)
-        # A failure here means the template has structural errors, not just unfilled placeholders
-
-      - name: Preflight mutation tests
-        run: node tests/preflight-validate.test.js
-        # Includes production fixture mutation cases for invalid roots, missing hooks,
-        # false sandbox gate and malformed UUIDs.
-
-      - name: Sandbox policy generator tests
-        run: node tests/generate-matter-sandbox.test.js
-
-      - name: Production settings renderer tests
-        run: node tests/render-production-settings.test.js
-
-      - name: Release manifest tests
-        run: node tests/generate-release-manifest.test.js
-
-      - name: Compliance skill evaluation pack
-        run: node tests/compliance-evaluation.test.js
-
-      - name: Records schema contract tests
-        run: node tests/records-schema.test.js
-
-      - name: Preflight validate synthetic production fixture
-        run: python3 scripts/preflight-validate.py --mode production test-fixtures/synthetic-production.json
-        # Expected: PASS. The synthetic fixture is a fully populated production settings
-        # file that must pass production preflight. If it fails, the preflight script
-        # or the fixture itself is broken.
-
-      - name: Generate release manifest (dry run)
-        run: |
-          mkdir -p dist
-          python3 scripts/generate-release-manifest.py \
-            --output dist/release-manifest.json \
-            --production-settings test-fixtures/synthetic-production.json \
-            --sandbox-policy test-fixtures/synthetic-sandbox-policy.json
-          python3 scripts/generate-release-manifest.py \
-            --verify \
-            --output dist/release-manifest.json \
-            --production-settings test-fixtures/synthetic-production.json \
-            --sandbox-policy test-fixtures/synthetic-sandbox-policy.json
+      - name: Full offline verification
+        run: python scripts/verify.py
 
   secrets:
     name: secret scan
@@ -149,14 +96,14 @@ jobs:
       # repositories, so it can never pass here. This is a dependency-free
       # scan of the same history; GitHub secret scanning and push protection
       # should be enabled as well before the repository is made public.
-      - name: Scan full history
-        run: python3 scripts/scan-history.py
+      - name: Scan history and pending changes
+        run: python3 scripts/scan-history.py --worktree
 
       - name: History scanner tests
         run: node tests/scan-history.test.js
 
       - name: Scan Office XML
-        run: python3 scripts/scan-docx-xml.py
+        run: python3 scripts/scan-docx-xml.py --history --worktree
 
       - name: Office XML scanner tests
         run: node tests/scan-docx-xml.test.js

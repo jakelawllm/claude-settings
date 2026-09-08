@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) loos
 
 ## Unreleased
 
+### Internal-MVP review — 2026-09-07
+
+This entry supersedes older unreleased statements about current behavior. See the [reconciled assessment](docs/INTERNAL_MVP_READINESS_REPORT.md) for executed checks and unresolved external requirements.
+
+- Closed matter-root, relative-path, state and archive access gaps. Session binding is atomic; archive publication is collision-safe and retry-idempotent. Central archives now include a canonical matter identity hash. Preserve and explicitly map legacy central archives before migration.
+- Added strict single-matter release validation, no-clobber atomic writes, endpoint and evidence freshness checks, and explicit tested-client version metadata. Native Windows and macOS production preflight refuse unsupported deployment paths.
+- Raised the declared client minimum to 2.1.251, explicitly disabled all five telemetry content gates and enabled subprocess credential scrubbing. The version range remains a policy declaration requiring actual host acceptance.
+- Corrected the Windows hash lock, strengthened history/Office scanners and fail-closed DOCX conversion, and extended clause-reference checks. Added a cross-platform verification runner and stable LF schema/Markdown attributes.
+- Replaced the response-only live oracle with actual hook-event and archive evidence. The native Windows live hook run passed 13 checks; OS isolation is a separate acceptance requirement.
+- Disabled optional Claude automation by default and restricted activation to a current maintainer with an explicit read-only GitHub token.
+- Updated setup, architecture, operations, agent/contributor instructions and configuration examples. Corrected policy deployment claims, interpretation approval labels and transcript-copy terminology in the authoritative DOCX; improved contents/table pagination in both documents and regenerated Markdown.
+
 ### Security
 
 - Production preflight now distinguishes the shipped template from rendered deployment settings, rejects production placeholders and warn-mode defaults, requires strict sandbox and MCP controls, checks hook wiring, and blocks unresolved governance registers.
