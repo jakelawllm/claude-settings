@@ -21,3 +21,6 @@ claude-settings-production-readiness-review.md
 .env
 .env.*
 !.env.example
+
+# Local agent runtime: credentials, session history and vendored plugin caches
+/.claude-orch/

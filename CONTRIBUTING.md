@@ -47,3 +47,5 @@ Dependencies are in requirements.txt and requirements-lock.txt. Retain the expli
 Preserve existing formatting, UTF-8 and generated LF line endings. There is no standalone formatter, linter or type checker; git diff --check, syntax, schema and behavioral tests are the quality gates.
 
 Only synthetic names, paths, account UUIDs and endpoints belong in fixtures. Never commit .env, production settings, credentials, transcripts or identifying evidence. Run history and Office XML scanners; logs must report safe labels/locations without matched content.
+
+Local agent runtimes such as `.claude-orch/` contain credentials, session history and downloaded plugins; keep them ignored and never force-add them. The Markdown link check covers tracked files and new nonignored documents. It includes tracked `.claude/` documentation while Git prunes ignored local caches and worktrees.

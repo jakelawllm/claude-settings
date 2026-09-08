@@ -35,10 +35,19 @@ def run(*command: str, expected: int = 0) -> str:
 
 def local_links() -> None:
     """Check repository-relative Markdown links without making network requests."""
+    # Git prunes ignored runtime/cache trees without visiting their Markdown.
+    # Include tracked files even under ignored directories (for example a
+    # deliberately versioned .claude/README.md), plus new nonignored docs.
+    result = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard",
+         "--", "*.md"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+        timeout=30,
+    )
+    if result.returncode:
+        raise RuntimeError("could not list repository Markdown files with Git")
     count = 0
-    for path in sorted(ROOT.rglob("*.md")):
-        if any(part in {".git", "dist", ".venv", "node_modules"} for part in path.relative_to(ROOT).parts):
-            continue
+    for relative_path in sorted(set(result.stdout.split("\0")) - {""}):
+        path = ROOT / relative_path
         text = re.sub(r"```.*?```", "", path.read_text(encoding="utf-8"), flags=re.S)
         for target in re.findall(r"\]\((<[^>]+>|[^\s)]+)(?:\s+\"[^\"]*\")?\)", text):
             target = target.strip("<>")
@@ -61,6 +70,7 @@ def main() -> int:
     for path in sorted((ROOT / "scripts").glob("*.py")):
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     print("PASS: Python syntax")
+    run(PYTHON, "tests/verify-local-links.test.py")
     for folder in ("hooks", "tests"):
         for path in sorted((ROOT / folder).glob("*.js")):
             run("node", "--check", str(path.relative_to(ROOT)))
